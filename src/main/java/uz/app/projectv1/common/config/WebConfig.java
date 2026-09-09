@@ -1,4 +1,4 @@
-package uz.app.projectv1.config;
+package uz.app.projectv1.common.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.PathMatchConfigurer;
