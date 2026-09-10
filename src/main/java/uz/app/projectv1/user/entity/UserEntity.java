@@ -3,35 +3,29 @@ package uz.app.projectv1.user.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
+import uz.app.projectv1.common.entity.BaseEntity;
 import uz.app.projectv1.user.enums.UserRole;
 
-import java.time.LocalDateTime;
-
 @Entity
-@Table(name = "users")
+@Table(name = "users", indexes = @Index(name = "idx_users_email", columnList = "email", unique = true))
 @Getter
 @Setter
-public class UserEntity {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+@SQLDelete(sql = "UPDATE users SET deleted = true WHERE id = ?")
+@SQLRestriction("deleted = false")
+public class UserEntity extends BaseEntity {
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false, unique = true, length = 120)
     private String email;
 
     @Column(nullable = false)
     private String password;
 
+    @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     private UserRole role = UserRole.USER;
 
-    @Column(name = "is_active", nullable = false)
-    private boolean isActive = true;
-    @Column(name = "is_deleted", nullable = false)
-    private boolean isDeleted = false;
-
-    @Column(name = "created_date")
-    private LocalDateTime createdDate;
-    @Column(name = "updated_date")
-    private LocalDateTime updatedDate;
+    @Column(nullable = false)
+    private boolean active = true;
 }

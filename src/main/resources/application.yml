@@ -4,7 +4,7 @@ spring:
 
   datasource:
     url: jdbc:postgresql://localhost:5432/project_v1
-    username: macbookpro
+    username: postgres
     password: 1234
     driver-class-name: org.postgresql.Driver
 

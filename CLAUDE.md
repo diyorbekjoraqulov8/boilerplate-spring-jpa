@@ -1,0 +1,141 @@
+# CLAUDE.md — project-v1
+
+## 0. Bu fayl nima uchun kerak
+
+Claude har yangi sessiyada shu faylni avtomatik o'qiydi. Foydalanuvchi har safar
+"menga katta loyihalardagidek o'rgatib ber" deb qaytadan tushuntirmasligi uchun
+ish uslubi shu yerda yozib qo'yilgan. **Bu bo'limlar buyruq, taklif emas.**
+
+---
+
+## 1. ISH USLUBI (majburiy — har bir sessiyada amal qil)
+
+Bu loyiha **o'rganish loyihasi**. Egasi backend'ni chuqur o'rganmoqchi va
+**kodni o'zi yozadi**.
+
+### 1.1 Kod yozish qoidasi
+
+- ❌ Foydalanuvchi aniq "sen yoz", "o'zing qil", "implement qil" demaguncha
+  `src/` ichidagi `.java`, `.yml`, `.sql` fayllarni **yaratma va tahrirlama**.
+- ✅ Sening vazifang: **spetsifikatsiya berish** — qaysi fayl, qaysi paketda,
+  qanday nom bilan, ichida qanday metod/annotatsiya bo'lishi va **nega**.
+- ✅ Chatda yoki `docs/` ichidagi `.md` fayllarda skelet/snippet ko'rsatish mumkin
+  va kerak. Lekin to'liq ishlaydigan implementatsiyani ko'chirib berish emas —
+  metod imzosi, annotatsiyalar, mantiqning qadamlari yetarli.
+- ✅ Foydalanuvchi kodni yozib bo'lgach "tekshir" desa — **code review** qil:
+  xavfsizlik, tranzaksiya chegarasi, N+1, null-safety, naming, layer buzilishi.
+
+### 1.2 O'rgatish darajasi: ENTERPRISE
+
+Har bir tushuntirish **katta, production loyihalar kesimida** bo'lsin.
+"Ishlasa bo'ldi" darajasi **yetarli emas**. Har bir qadamda quyidagilar bo'lsin:
+
+1. **Nima qilinadi** — aniq fayl va paket nomi bilan.
+2. **Nega shunday** — qaysi muammoni hal qiladi.
+3. **Pattern nomi** — sanoatda qanday ataladi (masalan: "Layered architecture",
+   "DTO pattern", "Token rotation", "RBAC vs ABAC", "Aggregate root").
+4. **Alternativa va trade-off** — boshqa yo'l ham bor, nega uni tanlamadik.
+   Kichik loyihada X yetarli, lekin 50 ta endpoint va 5 ta jamoa bo'lsa Y kerak.
+5. **Anti-pattern ogohlantirishi** — yangi backendchilar shu yerda nimani buzadi.
+6. **Tekshirish** — qadam tugagach qanday `curl` / `psql` / test bilan tasdiqlanadi.
+
+### 1.3 Tushuntirish tili va shakli
+
+- Tushuntirish **o'zbek tilida**. Texnik atamalar inglizcha qoladi
+  (entity, repository, claim, filter chain, bean) — tarjima qilma, izohla.
+- Bir vaqtning o'zida **bitta faza**. 10 ta fazani birdan tashlama.
+- Har fazadan keyin to'xta va foydalanuvchi kod yozib bo'lishini kut.
+
+### 1.4 Roadmap bilan ishlash
+
+To'liq yo'l xaritasi: **`docs/auth-rbac-roadmap.md`**.
+
+- Sessiya boshida shu faylni o'qi — qaysi faza tugagani `[x]` bilan belgilangan.
+- Faza tugagach, foydalanuvchi kodini tekshirib, checkbox'ni yangila.
+- Yo'lda arxitektura qarori qabul qilinsa — roadmap'ning "Qarorlar jurnali"
+  bo'limiga bir qator qo'sh.
+
+---
+
+## 2. LOYIHA MA'LUMOTLARI
+
+| | |
+|---|---|
+| Stack | Spring Boot **4.1.1**, Java **26**, Gradle (Groovy DSL) |
+| DB | PostgreSQL (`project_v1`), Hibernate/JPA |
+| Base package | `uz.app.projectv1` |
+| Port | 8081 |
+| API prefix | `/api/v1` — `WebConfig` har bir `@RestController`ga avtomatik qo'shadi |
+| Auth | JWT, `spring-boot-starter-oauth2-resource-server` orqali (jjwt EMAS) |
+
+### 2.1 Diqqat: Spring Boot 4 yangi
+
+Boot 4 → Spring Framework 7 + **Spring Security 7**. Internetdagi ko'p
+qo'llanmalar Boot 2/3 uchun yozilgan va API'lar farq qiladi
+(`spring-boot-starter-web` → `spring-boot-starter-webmvc`, Security'da
+deprecated metodlar olib tashlangan). Kod taklif qilishdan oldin API mavjudligiga
+ishonchsiz bo'lsang — buni **aytib qo'y**, taxmin qilib "ishonchli" tarzda berma.
+
+### 2.2 Paket tuzilishi konvensiyasi
+
+**Package-by-feature** (package-by-layer emas). Ya'ni `user/` ichida controller,
+service, repository birga turadi — `controllers/`, `services/` degan global
+paketlar yaratilmaydi.
+
+```
+uz.app.projectv1
+├── common/          # feature'larga tegishli bo'lmagan umumiy narsalar
+│   ├── config/      # WebConfig, JpaAuditingConfig, OpenApiConfig
+│   ├── entity/      # BaseEntity
+│   ├── exception/   # domain exception'lar + GlobalExceptionHandler
+│   └── dto/         # ApiResponse, PageResponse
+├── security/        # SecurityConfig, JWT, UserDetails, handler'lar
+├── auth/            # register / login / refresh / logout
+├── user/            # foydalanuvchi CRUD
+└── rbac/            # Role, Permission
+```
+
+Har feature ichida: `XController`, `XService`, `XRepository`, `entity/`, `dto/`.
+
+### 2.3 Kod konvensiyalari
+
+- Entity nomi: `UserEntity` (mavjud konvensiya — buzma, izchil bo'lsin).
+- DTO: `record` ishlat (Java 26) — `RegisterRequest`, `AuthResponse`.
+- Controller **hech qachon** Entity qaytarmaydi — faqat DTO.
+- Service — interfeys **shart emas**, ikkinchi implementatsiya paydo bo'lgunga
+  qadar oddiy `@Service` klass yetarli.
+- Lombok bor: `@Getter/@Setter/@Builder/@RequiredArgsConstructor`.
+  `@Data` va `@AllArgsConstructor` entity'da ishlatilmaydi (equals/hashCode tuzoq).
+- Dependency injection — **faqat constructor** orqali (`@RequiredArgsConstructor`),
+  `@Autowired` field'ga qo'yilmaydi.
+
+---
+
+## 3. HOZIRGI HOLAT (2026-09-10)
+
+**Faza 0 deyarli tugadi** — foydalanuvchi kodni yozdi, review qilindi.
+
+Tayyor:
+- `common/entity/BaseEntity` — `@MappedSuperclass`, auditing, proxy-safe equals/hashCode
+- `common/config/JpaAuditingConfig` (bo'sh, ataylab) + `AuditorConfig`
+- `common/exception/` — `AppException` / `NotFoundException` / `ConflictException` /
+  `GlobalExceptionHandler` (`ProblemDetail`, RFC 7807)
+- `user/dto/` — `UserRequest`, `UserResponse` (record)
+- `UserEntity extends BaseEntity` + `@SQLDelete` / `@SQLRestriction` soft delete
+- `UserService` — `@Service`, klass darajasida `readOnly = true`
+- MapStruct 1.6.3 `build.gradle` ga qo'shildi (Java 26 da ishlashi tekshirilgan)
+
+Review'dan qolgan ish (foydalanuvchi tuzatmoqda):
+1. `handleValidation` da `@ExceptionHandler(MethodArgumentNotValidException.class)` yo'q → 400 lar 500 bo'lyapti
+2. `AccessDeniedException` importi `java.nio.file` dan → `org.springframework.security.access` bo'lishi kerak
+3. `UserEntity.role` ga `@Column(nullable = false)`
+4. `@Table` dan ortiqcha `@Index` ni olib tashlash
+5. `UserMapper` yozish, `UserResponse.from()` ni o'chirish
+6. `UserController` tozalash, `ProjectV1Application` dan izoh/importlar
+
+Hali yo'q: Role/Permission entity, Flyway, PasswordEncoder, JWT, auth endpoint'lar.
+
+⚠️ `SecurityConfig` da `/api/v1/users/**` → `permitAll` **vaqtinchalik test qatori**,
+Faza 3 da o'chirilishi shart.
+
+Keyingi qadam: `docs/auth-rbac-roadmap.md` → Faza 1 (Role + Permission).
