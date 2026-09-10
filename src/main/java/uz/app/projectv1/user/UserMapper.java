@@ -15,6 +15,7 @@ public interface UserMapper {
     UserResponse toResponse(UserEntity entity);
 
     List<UserResponse> toResponseList(List<UserEntity> entities);
+
     @Mapping(target = "id",          ignore = true)
     @Mapping(target = "createdDate", ignore = true)
     @Mapping(target = "updatedDate", ignore = true)

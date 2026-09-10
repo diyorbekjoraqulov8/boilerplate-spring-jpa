@@ -1,8 +1,5 @@
 package uz.app.projectv1.user.dto;
 
-import uz.app.projectv1.user.UserMapper;
-import uz.app.projectv1.user.entity.UserEntity;
-
 import java.time.LocalDateTime;
 
 public record UserResponse(

@@ -113,29 +113,35 @@ Har feature ichida: `XController`, `XService`, `XRepository`, `entity/`, `dto/`.
 
 ## 3. HOZIRGI HOLAT (2026-09-10)
 
-**Faza 0 deyarli tugadi** — foydalanuvchi kodni yozdi, review qilindi.
+**✅ Faza 0 tugadi** — kod yozildi, review qilindi, ishlab turgan ilovada tekshirildi.
 
 Tayyor:
 - `common/entity/BaseEntity` — `@MappedSuperclass`, auditing, proxy-safe equals/hashCode
 - `common/config/JpaAuditingConfig` (bo'sh, ataylab) + `AuditorConfig`
 - `common/exception/` — `AppException` / `NotFoundException` / `ConflictException` /
-  `GlobalExceptionHandler` (`ProblemDetail`, RFC 7807)
-- `user/dto/` — `UserRequest`, `UserResponse` (record)
+  `GlobalExceptionHandler extends ResponseEntityExceptionHandler` (`ProblemDetail`, RFC 7807)
+- `user/dto/` — `UserRequest`, `UserResponse` (record, toza)
 - `UserEntity extends BaseEntity` + `@SQLDelete` / `@SQLRestriction` soft delete
 - `UserService` — `@Service`, klass darajasida `readOnly = true`
-- MapStruct 1.6.3 `build.gradle` ga qo'shildi (Java 26 da ishlashi tekshirilgan)
+- `UserMapper` — MapStruct 1.6.3, `unmappedTargetPolicy = ERROR` (Java 26 da tekshirilgan)
 
-Review'dan qolgan ish (foydalanuvchi tuzatmoqda):
-1. `handleValidation` da `@ExceptionHandler(MethodArgumentNotValidException.class)` yo'q → 400 lar 500 bo'lyapti
-2. `AccessDeniedException` importi `java.nio.file` dan → `org.springframework.security.access` bo'lishi kerak
-3. `UserEntity.role` ga `@Column(nullable = false)`
-4. `@Table` dan ortiqcha `@Index` ni olib tashlash
-5. `UserMapper` yozish, `UserResponse.from()` ni o'chirish
-6. `UserController` tozalash, `ProjectV1Application` dan izoh/importlar
+Tekshirilgan javoblar: `/users` 200, `/users/999` 404, `/users/abc` **400**,
+noma'lum yo'l 403 (Security filtri, Faza 3 da tuzatiladi).
+
+Qolgan mayda ish (bloklamaydi):
+1. `GlobalExceptionHandler:26` — annotatsiyasiz `handleValidation` **o'lik kod**,
+   `handleMethodArgumentNotValid` override uni almashtirgan → o'chirilsin
+2. `handleExceptionInternal` 404/405 ni ham `code: "BAD_REQUEST"` deb belgilaydi
+3. `ProjectV1Application` — izohga olingan `CommandLineRunner` + ishlatilmagan importlar
 
 Hali yo'q: Role/Permission entity, Flyway, PasswordEncoder, JWT, auth endpoint'lar.
 
-⚠️ `SecurityConfig` da `/api/v1/users/**` → `permitAll` **vaqtinchalik test qatori**,
-Faza 3 da o'chirilishi shart.
+⚠️ Ikki vaqtinchalik narsa Faza 3 da tuzatiladi:
+- `SecurityConfig` da `/api/v1/users/**` → `permitAll`
+- CSRF yoqiq → hozir har qanday POST/PUT/DELETE **403** qaytaradi
+
+⚠️ Windows va macOS DB'larida `users` jadvali **har xil** chiqdi (`role` ustuni
+biryerda nullable, biryerda not null) — `ddl-auto: update` mavjud ustunni
+o'zgartirmaydi. Bu Faza 2 (Flyway) ning tirik dalili.
 
 Keyingi qadam: `docs/auth-rbac-roadmap.md` → Faza 1 (Role + Permission).

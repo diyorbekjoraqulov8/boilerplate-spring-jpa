@@ -8,7 +8,7 @@
 
 ## Progress
 
-- [ ] **Faza 0** — Fundament: BaseEntity, auditing, exception handling, DTO qatlami
+- [x] **Faza 0** — Fundament: BaseEntity, auditing, exception handling, DTO qatlami ✅ 2026-09-10
 - [ ] **Faza 1** — Domen: Role + Permission entity'lar, RBAC modeli
 - [ ] **Faza 2** — Migration: Flyway + seed data
 - [ ] **Faza 3** — Security infra: PasswordEncoder, UserDetails, UserDetailsService
@@ -876,3 +876,5 @@ olti oydan keyin ham javobsiz qolmasin.
 | 5 | 2026-09-10 | MapStruct (1.6.3) Faza 0 dan boshlab | `unmappedTargetPolicy=ERROR` — unutilgan maydon build'ni yiqitadi. Java 26 da ishlashi tekshirildi |
 | 6 | 2026-09-10 | Soft delete: `@SQLRestriction` + kerak bo'lganda native query | Default xavfsiz (faqat tiriklar), admin/audit uchun eshik ochiq. `@FilterDef` — teskari default, AOP kerak, hozir ortiqcha |
 | 7 | 2026-09-10 | `email` uchun **qisman** unique index (Faza 2) | Soft delete bilan oddiy unique constraint o'chirilgan email'ni abadiy band qiladi |
+| 8 | 2026-09-10 | `GlobalExceptionHandler extends ResponseEntityExceptionHandler` | Spring MVC'ning ~20 ta standart xatosi (tip mos kelmasligi, buzuq JSON, noto'g'ri HTTP metod, topilmagan yo'l) `Exception.class` ga tushib 500 bo'lib ketmasin |
+| 9 | 2026-09-10 | `@Table(indexes = @Index(unique = true))` **qoldiriladi** | Tekshirildi: Hibernate `@Column(unique=true)` bilan birlashtiradi, DB'da bitta obyekt chiqadi. `@Index` unga o'qiladigan nom beradi (`UK_6dotkott...` emas, `idx_users_email`) |
