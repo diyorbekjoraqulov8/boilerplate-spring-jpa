@@ -27,6 +27,12 @@ public class UserService {
         return userMapper.toResponseList(userRepository.findAll());
     }
 
+    public UserResponse findByEmail(String email) {
+        return userRepository.findWithPermissionsByEmail(email)
+                .map(userMapper::toResponse)
+                .orElseThrow(() -> new NotFoundException("Foydalanuvchi", email));
+    }
+
     @Transactional
     public void delete(Long id) {
         UserEntity user = userRepository.findById(id)

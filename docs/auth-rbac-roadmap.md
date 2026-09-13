@@ -9,7 +9,7 @@
 ## Progress
 
 - [x] **Faza 0** — Fundament: BaseEntity, auditing, exception handling, DTO qatlami ✅ 2026-09-10
-- [ ] **Faza 1** — Domen: Role + Permission entity'lar, RBAC modeli
+- [x] **Faza 1** — Domen: Role + Permission entity'lar, RBAC modeli ✅ 2026-09-13
 - [ ] **Faza 2** — Migration: Flyway + seed data
 - [ ] **Faza 3** — Security infra: PasswordEncoder, UserDetails, UserDetailsService
 - [ ] **Faza 4** — JWT: RSA kalitlar, JwtEncoder/JwtDecoder, claim → authority

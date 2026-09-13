@@ -134,7 +134,14 @@ Qolgan mayda ish (bloklamaydi):
 2. `handleExceptionInternal` 404/405 ni ham `code: "BAD_REQUEST"` deb belgilaydi
 3. `ProjectV1Application` — izohga olingan `CommandLineRunner` + ishlatilmagan importlar
 
-Hali yo'q: Role/Permission entity, Flyway, PasswordEncoder, JWT, auth endpoint'lar.
+**✅ Faza 1 tugadi** (2026-09-13) — `rbac/` paketi: `Role`, `Permission` entity'lar
+(ManyToMany, cascade yo'q, LAZY, `Set`), `RoleRepository`, `PermissionRepository`,
+`Permissions` + `RoleNames` konstantalari. `UserEntity.role` enum → `Set<Role> roles`.
+`user/enums/` paketi o'chirildi.
+
+O'lchangan so'rovlar soni: `GET /users` → 1, `find-by-email` → 1, `GET /users/{id}` → **2** (N+1).
+
+Hali yo'q: Flyway, PasswordEncoder, JWT, auth endpoint'lar.
 
 ⚠️ Ikki vaqtinchalik narsa Faza 3 da tuzatiladi:
 - `SecurityConfig` da `/api/v1/users/**` → `permitAll`
