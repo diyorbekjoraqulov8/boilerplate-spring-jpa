@@ -28,7 +28,7 @@ public class UserService {
     }
 
     public UserResponse findByEmail(String email) {
-        return userRepository.findWithPermissionsByEmail(email)
+        return userRepository.findByEmail(email)
                 .map(userMapper::toResponse)
                 .orElseThrow(() -> new NotFoundException("Foydalanuvchi", email));
     }
