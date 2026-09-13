@@ -139,7 +139,17 @@ Qolgan mayda ish (bloklamaydi):
 `Permissions` + `RoleNames` konstantalari. `UserEntity.role` enum → `Set<Role> roles`.
 `user/enums/` paketi o'chirildi.
 
-O'lchangan so'rovlar soni: `GET /users` → 1, `find-by-email` → 1, `GET /users/{id}` → **2** (N+1).
+O'lchangan so'rovlar soni (5 user, 3 rol): `GET /users` → 1, `GET /users/{id}` → 1,
+`find-by-email` → 1. N+1 yo'q.
+
+**DTO qarori:** `UserResponse` — tekis (`Set<String> roles`). `RoleResponse` /
+`PermissionResponse` (ichma-ich) yozilgan, lekin hozircha ishlatilmaydi — ular
+Faza 6 dagi rol admin endpoint'lari uchun. Permission'lar Faza 5 da `MeResponse`
+orqali tekis `Set<String>` sifatida qaytariladi.
+
+⚠️ Qoida: **DTO ichiga collection qo'shsang, `@EntityGraph` ni ham yangila.**
+Bir marta buzilgan: `UserResponse` ichma-ich qilinganda `GET /users` 1 → 8 so'rovga
+chiqib ketgan edi (`open-in-view` yoqiq bo'lgani uchun xato bermay, jimgina).
 
 Hali yo'q: Flyway, PasswordEncoder, JWT, auth endpoint'lar.
 

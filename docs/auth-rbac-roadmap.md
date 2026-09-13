@@ -461,6 +461,32 @@ Hibernate shartli index generatsiya qila olmaydi, shuning uchun:
 `UserEntity` dan `unique = true` va `@Index(unique = true)` **olib tashlanadi**,
 index faqat migration'da yashaydi.
 
+## 2.3.2 ⚠️ Hal qilinadigan savol: `roles`/`permissions` da soft delete
+
+`Role` va `Permission` `BaseEntity` dan meros oladi, demak ularda ham `deleted`
+ustuni bor. Lekin `@SQLDelete`/`@SQLRestriction` **yo'q** — ya'ni ustun bor,
+lekin hech kim uni yozmaydi ham, o'qimaydi ham. O'lik ustun.
+
+Migration'ni qo'lda yozayotganda qaror qabul qilinadi:
+
+| Variant | Oqibati |
+|---|---|
+| `deleted` ustunini **yozmaslik** | Model rost bo'ladi; `BaseEntity` ni `BaseEntity` (id+audit) va `SoftDeletableEntity` ga bo'lish kerak |
+| `@SQLDelete`+`@SQLRestriction` qo'shish | Izchil, lekin `name` unique bilan bir xil tuzoq: o'chirilgan `MANAGER` nomini qayta ishlatib bo'lmaydi |
+| Hozirgidek qoldirish | Ustun bekor turadi, keyingi o'quvchi chalkashadi |
+
+FK himoyasi allaqachon bor — tekshirildi:
+
+```
+DELETE FROM roles WHERE name='ADMIN';
+ERROR: violates foreign key constraint on table "role_permissions"
+```
+
+Ya'ni biriktirilgan rolni o'chirib bo'lmaydi. Faza 6 dagi `RoleService.delete()`
+avval `systemRole` ni tekshirib, keyin `role.getPermissions().clear()` va
+`user_roles` bog'lanishlarini uzishi, keyingina o'chirishi kerak — aks holda
+DB xatosi 500 bo'lib chiqadi.
+
 ## 2.4 Boshlang'ich holat
 
 Hozirgi DB'da `users` jadvali `ddl-auto: update` bilan yaratilgan. Toza

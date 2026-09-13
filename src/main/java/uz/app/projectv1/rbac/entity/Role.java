@@ -3,6 +3,8 @@ package uz.app.projectv1.rbac.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
 import uz.app.projectv1.common.entity.BaseEntity;
 
 import java.util.HashSet;
@@ -12,6 +14,8 @@ import java.util.Set;
 @Table(name = "roles")
 @Getter
 @Setter
+@SQLDelete(sql = "UPDATE roles SET deleted = true WHERE id = ?")
+@SQLRestriction("deleted = false")
 public class Role extends BaseEntity {
 
     @Column(nullable = false, unique = true, length = 64)
