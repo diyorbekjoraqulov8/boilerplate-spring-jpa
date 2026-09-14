@@ -40,5 +40,7 @@ public class RoleService {
         newRole.setDescription(request.description());
 
         this.roleRepository.save(newRole);
+
+        return roleMapper.toResponseWithPermission(newRole);
     }
 }
