@@ -44,7 +44,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
 
 //    Migration
-    implementation 'org.flywaydb:flyway-core'
+//    Boot 4 da Flyway autoconfiguration alohida modulda — starter'siz Flyway umuman ishga tushmaydi
+    implementation 'org.springframework.boot:spring-boot-starter-flyway'
     implementation 'org.flywaydb:flyway-database-postgresql'
 }
 

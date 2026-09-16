@@ -12,14 +12,14 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Entity
-@Table(name = "users", indexes = @Index(name = "idx_users_email", columnList = "email", unique = true))
+@Table(name = "users")
 @Getter
 @Setter
 @SQLDelete(sql = "UPDATE users SET deleted = true WHERE id = ?")
 @SQLRestriction("deleted = false")
 public class UserEntity extends BaseEntity {
 
-    @Column(nullable = false, unique = true, length = 120)
+    @Column(nullable = false, length = 120)
     private String email;
 
     @Column(nullable = false)
