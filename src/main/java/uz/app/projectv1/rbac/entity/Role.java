@@ -18,7 +18,7 @@ import java.util.Set;
 @SQLRestriction("deleted = false")
 public class Role extends BaseEntity {
 
-    @Column(nullable = false, unique = true, length = 64)
+    @Column(nullable = false, length = 64)
     private String name;
 
     @Column(length = 255)

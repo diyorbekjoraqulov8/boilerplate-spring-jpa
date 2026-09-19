@@ -17,7 +17,7 @@ import uz.app.projectv1.common.entity.BaseEntity;
 @SQLRestriction("deleted = false")
 public class Permission extends BaseEntity {
 
-    @Column(nullable = false, unique = true, length = 64)
+    @Column(nullable = false, length = 64)
     private String name;
 
     @Column(length = 255)

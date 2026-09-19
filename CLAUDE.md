@@ -151,7 +151,54 @@ orqali tekis `Set<String>` sifatida qaytariladi.
 Bir marta buzilgan: `UserResponse` ichma-ich qilinganda `GET /users` 1 → 8 so'rovga
 chiqib ketgan edi (`open-in-view` yoqiq bo'lgani uchun xato bermay, jimgina).
 
-Hali yo'q: Flyway, PasswordEncoder, JWT, auth endpoint'lar.
+**✅ Faza 2 tugadi** (2026-09-17) — Flyway. `ddl-auto: validate`,
+`db/migration/` da V1–V4 (users → rbac jadvallar → permission/rol seed → 4 ta
+dev user). Constraint'lar o'z nomi bilan (`pk_users`, `fk_user_roles_role`, ...).
+**Qisman (partial) unique index'lar** — `users.email`, `roles.name`, `permissions.name`
+uchun `... WHERE deleted = FALSE`. Sabab: uchala entity'da ham `@SQLRestriction`
+soft delete bor, oddiy `UNIQUE` esa o'chirilgan qiymatni abadiy band qilardi
+(`existsByX` uni ko'rmaydi → `INSERT` → duplicate key → 500).
+Shu sabab **`UserEntity`, `Role`, `Permission` da `unique = true` YO'Q** (ataylab).
+
+⚠️ Qisman index'ning oqibati: `ON CONFLICT (name)` **ishlamaydi** —
+`there is no unique or exclusion constraint matching the ON CONFLICT specification`.
+Shart index'dagi shart bilan aynan mos bo'lishi kerak:
+`ON CONFLICT (name) WHERE deleted = FALSE DO NOTHING`.
+
+⚠️ Boot 4 da Flyway uchun `flyway-core` **yetarli emas** — autoconfiguration
+alohida modulda. Kerak: `spring-boot-starter-flyway` + `flyway-database-postgresql`.
+`flyway-core` bilan Flyway **jimgina ishga tushmaydi**.
+
+⚠️ `ddl-auto: validate` **tekshirmaydi**: ustun uzunligi (`VARCHAR(255)` vs
+`length = 64` — sinab ko'rilgan, xato bermaydi), index, unique, FK, check.
+Faqat jadval / ustun nomi / tipni tekshiradi.
+
+Dev userlar: `admin@app.co`, `user@app.co`, `manager@app.co`, `operator@app.co` —
+paroli `Parol12345`, `{bcrypt}` prefiksli hash bilan seed qilingan.
+
+Migration'larni ilovani ko'tarmasdan tekshirish:
+```bash
+dropdb --if-exists mig_test; createdb mig_test
+for f in src/main/resources/db/migration/V*.sql; do psql -q -d mig_test -f "$f"; done
+dropdb mig_test
+```
+
+**✅ Faza 2.5 tugadi** (2026-09-19) — sirlar env'da:
+```yaml
+url:      ${DB_URL:jdbc:postgresql://localhost:5432/project_v1}
+username: ${DB_USERNAME:postgres}
+password: ${DB_PASSWORD}           # default YO'Q
+```
+Ishga tushirish uchun `DB_USERNAME=macbookpro` va `DB_PASSWORD=...` kerak
+(IntelliJ Run Config yoki `export`). `DB_USERNAME` defaulti `postgres` — bu
+mashinada mavjud emas, shuning uchun o'rnatish majburiy.
+
+⚠️ `spring.datasource.*` da yechilmagan `${VAR}` **exception tashlamaydi** —
+literal satr sifatida o'tib ketadi (tekshirilgan). Lokalda `trust` auth bilan
+ilova baribir ulanadi. Prodda parol xato bo'lgani uchun yiqiladi, lekin xabar
+`password authentication failed` bo'ladi, "placeholder" haqida emas.
+
+Hali yo'q: PasswordEncoder, JWT, auth endpoint'lar.
 
 ⚠️ Ikki vaqtinchalik narsa Faza 3 da tuzatiladi:
 - `SecurityConfig` da `/api/v1/users/**` → `permitAll`

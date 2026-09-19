@@ -10,7 +10,8 @@
 
 - [x] **Faza 0** — Fundament: BaseEntity, auditing, exception handling, DTO qatlami ✅ 2026-09-10
 - [x] **Faza 1** — Domen: Role + Permission entity'lar, RBAC modeli ✅ 2026-09-13
-- [ ] **Faza 2** — Migration: Flyway + seed data
+- [x] **Faza 2** — Migration: Flyway + seed data ✅ 2026-09-17
+- [x] **Faza 2.5** — Sirlarni env'ga chiqarish ✅ 2026-09-19
 - [ ] **Faza 3** — Security infra: PasswordEncoder, UserDetails, UserDetailsService
 - [ ] **Faza 4** — JWT: RSA kalitlar, JwtEncoder/JwtDecoder, claim → authority
 - [ ] **Faza 5** — Auth endpoint'lar: register / login / refresh / logout
@@ -516,6 +517,72 @@ SELECT r.name, p.name FROM roles r
 
 ---
 
+# FAZA 2.5 — Sirlarni environment'ga chiqarish
+
+Faza 7 dan **oldinga ko'chirildi** (2026-09-17), sabab: Faza 4 da RSA private key
+paydo bo'ladi. Mexanizm undan **oldin** joyida bo'lishi kerak — aks holda kalit
+ham `application.yml` ga yozilib, git'ga tushib ketadi.
+
+## `application.yml`
+
+```yaml
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/project_v1}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD}          # default YO'Q — yo'q bo'lsa ilova ko'tarilmaydi
+```
+
+Qoida: **sir bo'lmagan qiymatga default bering, sirga — hech qachon.**
+`${DB_PASSWORD:1234}` yozish ma'nosiz — default'ning o'zi sir bo'lib qoladi.
+
+## ⚠️ TUZATISH: fail-fast ishlamaydi (2026-09-19 da tekshirildi)
+
+Avval bu yerda "default bo'lmasa Spring `Could not resolve placeholder` bilan
+yiqiladi" deb yozilgandi — **bu noto'g'ri**.
+
+Sinov: `--spring.datasource.url=${YOQ_BUNDAY_VAR}` bilan ishga tushirildi.
+Natija:
+
+```
+Driver ... claims to not accept jdbcUrl, ${YOQ_BUNDAY_VAR}
+```
+
+Ya'ni Spring **literal satrni o'tkazib yuboradi**, exception tashlamaydi.
+
+Sabab: `spring.datasource.*` `@ConfigurationProperties` (Binder) orqali
+bog'lanadi, u esa yechilmagan placeholder'ga toqat qiladi. Faqat `@Value`
+`Could not resolve placeholder` tashlaydi.
+
+**Amaliy oqibati:**
+- Lokalda PostgreSQL `trust` auth ishlatsa — parol umuman tekshirilmaydi,
+  ilova `${DB_PASSWORD}` satri bilan ham ulanaveradi
+- Prodda esa parol haqiqiy tekshiriladi → `password authentication failed`
+  → ilova ko'tarilmaydi. Ya'ni **baribir yiqiladi**, lekin xabar chalkash
+
+Xulosa: `${DB_PASSWORD}` (defaultsiz) yozish baribir to'g'ri — fayl ichida sir
+qolmaydi. Lekin "fail-fast aniq xabar beradi" deb ishonma.
+
+## Lokalda o'rnatish
+
+IntelliJ: Run Configuration → Environment variables → `DB_PASSWORD=1234`
+Terminal: `export DB_PASSWORD=1234` (yoki `~/.zshrc` ga)
+
+Tekshirildi: env o'zgaruvchilar `./gradlew bootRun` orqali forked JVM'ga yetib
+boradi, va Spring Boot'ning relaxed binding'i (`SPRING_DATASOURCE_URL` →
+`spring.datasource.url`) yml'dagi qiymatni bekor qiladi.
+
+## ⚠️ Parol git tarixida qoldi
+
+`1d94cd9` (birinchi commit) dan beri `password: 1234` git'da. Faylni tuzatish
+tarixni tozalamaydi. Haqiqiy sir bo'lganda yagona to'g'ri javob — **parolni
+almashtirish** (rotate), o'chirish emas. Bu lokal dev parol bo'lgani uchun
+amaliy xavf yo'q, lekin qoida shu.
+
+Kelasi uchun: `git-secrets` yoki `gitleaks` pre-commit hook — sirni commit
+qilishga urinishni to'sadi.
+
+---
+
 # FAZA 3 — Security infratuzilmasi
 
 ## 3.1 `PasswordEncoder` bean — `security/SecurityBeansConfig.java`
@@ -870,8 +937,8 @@ yasa. Bir joyda bo'lsin.
 Ushbular tugagach qilinadi, oldin emas:
 
 - [ ] **Profillar** — `application-dev.yml`, `application-prod.yml`.
-      Parol/kalitlar `${DB_PASSWORD}` orqali env'dan. `application.yml` da
-      hech qanday sir bo'lmasin (hozir `password: 1234` git'da turibdi).
+      (Sirlarni env'ga chiqarish Faza 2.5 ga ko'chirildi — bu yerda faqat
+      muhitlarni ajratish qoladi: portlar, log darajasi, CORS manzillari.)
 - [ ] **CORS** — `SecurityConfig` da, `@CrossOrigin` bilan har controller'da emas.
 - [ ] **Brute-force himoyasi** — 5 marta xato login → hisobni 15 daqiqa
       bloklash (`failedAttempts`, `lockedUntil` ustunlari) yoki IP bo'yicha
