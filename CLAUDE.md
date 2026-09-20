@@ -198,7 +198,37 @@ literal satr sifatida o'tib ketadi (tekshirilgan). Lokalda `trust` auth bilan
 ilova baribir ulanadi. Prodda parol xato bo'lgani uchun yiqiladi, lekin xabar
 `password authentication failed` bo'ladi, "placeholder" haqida emas.
 
-Hali yo'q: PasswordEncoder, JWT, auth endpoint'lar.
+**✅ Faza 3 tugadi** — `SecurityBeansConfig` (`PasswordEncoder` = `DelegatingPasswordEncoder`),
+`CustomUserDetails` (adapter record), `CustomUserDetailsService`,
+`SecurityConfig` (stateless, CSRF cookie'da, `permitAll` olib tashlangan).
+Dev userlar paroli: **`Parol12345`** (V5 da tuzatilgan — V4 dagi hash buzuq edi).
+
+**🟡 Faza 4 asosiy qismi ishlaydi** (2026-09-20) — `JwtConfig` (RSA encoder/decoder +
+`BearerTokenResolver` cookie'dan + `JwtAuthenticationConverter`), `JwtService`,
+vaqtinchalik `POST /api/v1/auth/token`. O'lchangan: JWT bilan `GET /users/1` → **1 so'rov**,
+Basic auth bilan → **2 so'rov** (autentifikatsiya uchun qo'shimcha DB o'qish).
+
+**✅ Sessiyalar ishlaydi** (2026-09-20) — `sessions` jadvali (V6), `sid` claim,
+`SessionValidator` (`OAuth2TokenValidator`) decoder'ga ulangan. Sinab tasdiqlangan:
+sessiya bekor qilinsa **o'sha token darhol 401**, boshqa qurilma ishlashda davom
+etadi. Narx: +1 so'rov/request (1→2).
+
+⚠️ `setJwtValidator` standart tekshiruvlarni **almashtiradi** — `JwtValidators
+.createDefaultWithIssuer(issuer)` ni `DelegatingOAuth2TokenValidator` ga qo'shish
+shart, aks holda `exp` tekshirilmay qoladi.
+
+Qolgan: cookie sozlamalarini profildan olish (`CookieProperties`), refresh token
+(Faza 5 da `sessions` ga `refresh_token_hash` ustuni qo'shiladi).
+
+⚠️ **Spring Security nomlash tuzog'i:** sozlayotgan Spring sinfi bilan **bir xil nomli**
+o'z klassingni yaratma (`JwtAuthenticationConverter`, `BearerTokenResolver`) — u
+Spring'nikini soya qiladi va `new X()` o'zini o'zi yasaydi. Bean — konfiguratsiya
+klassi **ichidagi metod**, alohida klass emas.
+
+⚠️ **`@Value` importi:** `org.springframework.beans.factory.annotation.Value`.
+`lombok.Value` — klass annotatsiyasi, `Cannot find @interface method 'value()'` beradi.
+
+Hali yo'q: refresh token, `@PreAuthorize`, register/login/logout.
 
 ⚠️ Ikki vaqtinchalik narsa Faza 3 da tuzatiladi:
 - `SecurityConfig` da `/api/v1/users/**` → `permitAll`

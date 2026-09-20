@@ -11,10 +11,18 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
-    show-sql: true
     properties:
       hibernate:
         format_sql: true
 
+  profiles:
+    default: dev
+
 server:
   port: 8081
+
+jwt:
+  public-key: classpath:keys/public.pem
+  private-key: ${JWT_PRIVATE_KEY:classpath:keys/private.pem}
+  issuer: project-v1
+  access-token-ttl: 15m

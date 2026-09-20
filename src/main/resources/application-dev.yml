@@ -1,0 +1,7 @@
+spring:
+  jpa:
+    show-sql: true
+app:
+  cookie:
+    secure: false
+    same-site: Strict
