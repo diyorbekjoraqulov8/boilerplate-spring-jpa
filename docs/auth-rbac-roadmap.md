@@ -6,6 +6,18 @@
 >
 > Ish uslubi va o'rgatish qoidalari: `../CLAUDE.md`.
 
+## OCHIQ QARORLAR (hal qilinmagan)
+
+Bular bo'yicha kelishuvga kelinmagan. Har biri mustaqil qaror.
+
+| # | Savol | Variantlar | Holat |
+|---|---|---|---|
+| 1 | **CSRF** — `oauth2ResourceServer` uni cookie'dagi token uchun jimgina o'chiradi (o'lchangan: mos kelmaydigan token bilan ham 405) | (a) `CsrfFilter` dan keyin o'z filtri bilan tiklash (b) oshkora `disable` + faqat `SameSite=Strict` ga tayanish | ❌ tanlanmagan. **Hozirgi holat eng yomoni: sozlama bor, ishlamaydi** |
+| 2 | **Rol o'zgarganda access token'ni bekor qilish** | (a) `token_version` + refresh (jimgina yangilanish) (b) `revokeAllForUser` (parol bilan qayta login) (c) faqat qisqa TTL, bekor qilinmaydi | 🟡 (a) ga moyillik, lekin refresh **hali yo'q** — tartib: refresh → keyin token_version |
+| 3 | **`login`/`register` da eski cookie 401 beradi** | (a) alohida `SecurityFilterChain` + `securityMatcher` (b) `BearerTokenResolver` da yo'l tekshiruvi — **rad etilgan, noto'g'ri qatlam** (c) `AuthenticationEntryPoint` cookie'ni tozalasin | ❌ tanlanmagan |
+| 4 | **Sessiya tekshiruvi har so'rovda** (0.26 ms) | (a) hozirdek qoldirish (b) Caffeine cache, 30s TTL (c) faqat yozuv amallarida tekshirish | 🟡 (a) — Faza 7 da o'lchab qayta ko'riladi |
+| 5 | **Clock skew 60s** (`JwtTimestampValidator` defaulti) — muddati o'tgan token 60 soniya ishlaydi (o'lchangan) | `JwtTimestampValidator(Duration.ofSeconds(5))` | ❌ tuzatilmagan |
+
 ## Progress
 
 - [x] **Faza 0** — Fundament: BaseEntity, auditing, exception handling, DTO qatlami ✅ 2026-09-10
