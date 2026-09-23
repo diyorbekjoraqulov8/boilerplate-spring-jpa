@@ -10,10 +10,10 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
-import org.springframework.security.oauth2.jwt.JwtValidators;
 
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.time.Duration;
 import java.util.Arrays;
 
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
@@ -27,12 +27,12 @@ public class JwtConfig {
     @Value("${jwt.issuer}") private String issuer;
 
     @Bean
-    public JwtDecoder jwtDecoder(SessionValidator sessionValidator) {
+    public JwtDecoder jwtDecoder() {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withPublicKey(publicKey).build();
 
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
-                JwtValidators.createDefaultWithIssuer(issuer),
-                sessionValidator
+                new JwtTimestampValidator(Duration.ofSeconds(5)),
+                new JwtIssuerValidator(issuer)
         ));
         return decoder;
     }
@@ -53,16 +53,5 @@ public class JwtConfig {
                     .findFirst()
                     .orElse(null);
         };
-    }
-
-    @Bean
-    public JwtAuthenticationConverter jwtAuthenticationConverter() {
-        JwtGrantedAuthoritiesConverter grants = new JwtGrantedAuthoritiesConverter();
-        grants.setAuthorityPrefix("");
-        grants.setAuthoritiesClaimName("authorities");
-
-        JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
-        converter.setJwtGrantedAuthoritiesConverter(grants);
-        return converter;
     }
 }

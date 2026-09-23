@@ -6,17 +6,35 @@
 >
 > Ish uslubi va o'rgatish qoidalari: `../CLAUDE.md`.
 
-## OCHIQ QARORLAR (hal qilinmagan)
+## ARXITEKTURA QARORI (2026-09-23) — huquqlar token'da emas, DB'da
 
-Bular bo'yicha kelishuvga kelinmagan. Har biri mustaqil qaror.
+Zhrms loyihasini o'rganib, asosiy yondashuv o'zgartirildi:
 
-| # | Savol | Variantlar | Holat |
-|---|---|---|---|
-| 1 | **CSRF** — `oauth2ResourceServer` uni cookie'dagi token uchun jimgina o'chiradi (o'lchangan: mos kelmaydigan token bilan ham 405) | (a) `CsrfFilter` dan keyin o'z filtri bilan tiklash (b) oshkora `disable` + faqat `SameSite=Strict` ga tayanish | ❌ tanlanmagan. **Hozirgi holat eng yomoni: sozlama bor, ishlamaydi** |
-| 2 | **Rol o'zgarganda access token'ni bekor qilish** | (a) `token_version` + refresh (jimgina yangilanish) (b) `revokeAllForUser` (parol bilan qayta login) (c) faqat qisqa TTL, bekor qilinmaydi | 🟡 (a) ga moyillik, lekin refresh **hali yo'q** — tartib: refresh → keyin token_version |
-| 3 | **`login`/`register` da eski cookie 401 beradi** | (a) alohida `SecurityFilterChain` + `securityMatcher` (b) `BearerTokenResolver` da yo'l tekshiruvi — **rad etilgan, noto'g'ri qatlam** (c) `AuthenticationEntryPoint` cookie'ni tozalasin | ❌ tanlanmagan |
-| 4 | **Sessiya tekshiruvi har so'rovda** (0.26 ms) | (a) hozirdek qoldirish (b) Caffeine cache, 30s TTL (c) faqat yozuv amallarida tekshirish | 🟡 (a) — Faza 7 da o'lchab qayta ko'riladi |
-| 5 | **Clock skew 60s** (`JwtTimestampValidator` defaulti) — muddati o'tgan token 60 soniya ishlaydi (o'lchangan) | `JwtTimestampValidator(Duration.ofSeconds(5))` | ❌ tuzatilmagan |
+```
+Token:  sub (userId), email, sid, iss, iat, exp, jti     ← huquq YO'Q
+Har so'rovda:  sid → sessiya tirikmi | email → rol/permission DB'dan
+```
+
+`DbAuthenticationConverter` (`Converter<Jwt, AbstractAuthenticationToken>`)
+`jwtAuthenticationConverter` sifatida ulanadi va authority'larni **har so'rovda
+DB'dan** yig'adi. Principal — `AuthUser` record.
+
+**Shu tufayli KERAK EMAS bo'lgan narsalar:** `token_version`, `ver` claim,
+`bumpTokenVersion*`, `SessionValidator`, `authorities` claim, `SCOPE_` prefiksi
+muammosi, `AuthService.me(Jwt)`.
+
+Narx (o'lchangan): sessiya 0.06 ms + user/rol/permission 0.19 ms = **~0.25 ms**,
+2 ta so'rov. Evaziga rol o'zgarishi **keyingi so'rovdayoq** kuchga kiradi.
+
+## OCHIQ QARORLAR
+
+| # | Savol | Holat |
+|---|---|---|
+| 1 | **CSRF** — `oauth2ResourceServer` uni cookie'dagi token uchun jimgina o'chiradi (o'lchangan) | ❌ `CookieCsrfEnforcementFilter` yozilishi kerak. Hozir sozlama bor, ishlamaydi |
+| 2 | ~~Rol o'zgarganda token'ni bekor qilish~~ | ✅ **hal bo'ldi** — huquq token'da emas |
+| 3 | **`login`/`register` da eski cookie 401 beradi** | ❌ alohida `SecurityFilterChain` + `securityMatcher` |
+| 4 | **Har so'rovda 2 ta DB so'rovi** (~0.25 ms) | 🟡 qoldiriladi; Faza 7 da o'lchab cache ko'riladi |
+| 5 | ~~Clock skew 60s~~ | ✅ 4-qadamda `JwtTimestampValidator(5s)` bilan hal bo'ldi |
 
 ## Progress
 
@@ -26,7 +44,11 @@ Bular bo'yicha kelishuvga kelinmagan. Har biri mustaqil qaror.
 - [x] **Faza 2.5** — Sirlarni env'ga chiqarish ✅ 2026-09-19
 - [ ] **Faza 3** — Security infra: PasswordEncoder, UserDetails, UserDetailsService
 - [ ] **Faza 4** — JWT: RSA kalitlar, JwtEncoder/JwtDecoder, claim → authority
-- [ ] **Faza 5** — Auth endpoint'lar: register / login / refresh / logout
+- [x] **Faza 5A** — register / login / logout / me ✅ 2026-09-20
+- [ ] **Faza 4.5** — Huquqlarni token'dan DB'ga ko'chirish (`DbAuthenticationConverter`) ← **HOZIR**
+- [ ] **Faza 5B** — Refresh token: `sessions` ga `refresh_token_hash` (V7), rotatsiya, o'g'irlikni aniqlash
+- [ ] **Faza 5C** — `GET /auth/sessions`, `DELETE /auth/sessions/{id}` — faol seanslar
+- [ ] **Faza 5D** — `CookieCsrfEnforcementFilter` + `login`/`register` uchun alohida filter chain
 - [ ] **Faza 6** — Authorization: `@PreAuthorize`, permission-based tekshiruv
 - [ ] **Faza 7** — Production hardening: profillar, rate limit, CORS, testlar
 

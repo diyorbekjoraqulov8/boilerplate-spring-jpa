@@ -19,7 +19,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(
             HttpSecurity http,
-            JwtAuthenticationConverter jwtAuthConverter
+            DbAuthenticationConverter authConverter
     ) throws Exception {
         http
                 .csrf(csrf -> csrf
@@ -35,7 +35,7 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth -> oauth
-                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthConverter))
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(authConverter))
                 );
 
         return http.build();

@@ -7,11 +7,9 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import uz.app.projectv1.auth.dto.LoginRequest;
-import uz.app.projectv1.auth.dto.MeResponse;
 import uz.app.projectv1.auth.dto.RegisterRequest;
 import uz.app.projectv1.common.exception.ConflictException;
 import uz.app.projectv1.rbac.RoleNames;
@@ -25,8 +23,6 @@ import uz.app.projectv1.user.UserRepository;
 import uz.app.projectv1.user.entity.UserEntity;
 
 import java.time.Duration;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -86,31 +82,7 @@ public class AuthService {
     }
 
     @Transactional
-    public void logout(String sid) {
-        sessionService.revoke(UUID.fromString(sid));
-    }
-
-    public MeResponse me(Jwt jwt) {
-        Set<String> roles = new HashSet<>();
-        Set<String> permissions = new HashSet<>();
-
-        String claim = jwt.getClaimAsString("authorities");
-
-        if (claim != null && !claim.isBlank()) {
-            for (String authority : claim.split(" ")) {
-                if (authority.startsWith("ROLE_")) {
-                    roles.add(authority.substring("ROLE_".length()));
-                } else {
-                    permissions.add(authority);
-                }
-            }
-        }
-
-        return new MeResponse(
-                Long.valueOf(jwt.getSubject()),      // sub = user id
-                jwt.getClaimAsString("email"),
-                roles,
-                permissions
-        );
+    public void logout(UUID sessionId) {
+        sessionService.revoke(sessionId);
     }
 }

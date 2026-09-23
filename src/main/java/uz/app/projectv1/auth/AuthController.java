@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import uz.app.projectv1.auth.dto.LoginRequest;
 import uz.app.projectv1.auth.dto.MeResponse;
 import uz.app.projectv1.auth.dto.RegisterRequest;
+import uz.app.projectv1.security.AuthUser;
 import uz.app.projectv1.security.CookieService;
 import uz.app.projectv1.security.JwtService;
 import uz.app.projectv1.security.SessionService;
@@ -51,16 +52,16 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(
-            @AuthenticationPrincipal Jwt jwt,
+            @AuthenticationPrincipal AuthUser user,
             HttpServletResponse response
     ) {
-        this.authService.logout(jwt.getClaimAsString("sid"));
+        this.authService.logout(user.sessionId());
         response.addHeader(HttpHeaders.SET_COOKIE, cookieService.clearAuth().toString());
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/me")
-    public MeResponse me(@AuthenticationPrincipal Jwt jwt) {
-        return authService.me(jwt);
+    public MeResponse me(@AuthenticationPrincipal AuthUser user) {
+        return new MeResponse(user.id(), user.email(), user.roles(), user.permissions());
     }
 }
