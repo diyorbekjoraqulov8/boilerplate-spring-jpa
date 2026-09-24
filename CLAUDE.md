@@ -213,9 +213,59 @@ Basic auth bilan → **2 so'rov** (autentifikatsiya uchun qo'shimcha DB o'qish).
 sessiya bekor qilinsa **o'sha token darhol 401**, boshqa qurilma ishlashda davom
 etadi. Narx: +1 so'rov/request (1→2).
 
-⚠️ `setJwtValidator` standart tekshiruvlarni **almashtiradi** — `JwtValidators
-.createDefaultWithIssuer(issuer)` ni `DelegatingOAuth2TokenValidator` ga qo'shish
-shart, aks holda `exp` tekshirilmay qoladi.
+⚠️ `setJwtValidator` standart tekshiruvlarni **almashtiradi** — timestamp va issuer
+validator'larini qo'lda qo'shish shart, aks holda `exp` yoki `iss` tekshirilmay qoladi.
+`JwtValidators.createDefaultWithIssuer` **60 soniyalik clock skew** bilan keladi
+(o'lchangan: muddati o'tgan token 60s ishlayveradi) — shuning uchun
+`new JwtTimestampValidator(Duration.ofSeconds(5))` qo'lda yoziladi.
+
+**✅ Faza 4.5 tugadi** (2026-09-23) — **huquqlar token'dan DB'ga ko'chirildi**.
+Zhrms loyihasi tahlilidan keyin qabul qilingan arxitektura qarori.
+
+```
+Token:  sub, email, sid, iss, iat, exp, jti      ← authorities YO'Q (600 belgi)
+Har so'rovda:  sid → sessiya tirikmi | email → rol/permission DB'dan
+```
+
+`security/DbAuthenticationConverter` (`Converter<Jwt, AbstractAuthenticationToken>`)
+`jwtAuthenticationConverter` sifatida ulangan; principal — `security/AuthUser` record
+(id, email, sessionId, roles, permissions). `@AuthenticationPrincipal AuthUser` ishlaydi.
+
+**Sinab tasdiqlangan:** `DELETE FROM user_roles` → **o'sha token bilan**
+`/auth/me` darhol `roles: []`, `/admin/**` 403. Rol qaytarilganda yana 200.
+Token'ga umuman tegilmaydi.
+
+So'rovlar: `/auth/me` → 2, `/users/1` → 3 (auth uchun doim +2).
+
+**Shu qaror tufayli KERAK EMAS:** `token_version`, `ver` claim, `bumpTokenVersion*`,
+`SessionValidator`, `authorities` claim, `SCOPE_` prefiksi muammosi, `AuthService.me(Jwt)`.
+
+**✅ Faza 5B tugadi** (2026-09-23) — refresh token rotatsiya bilan.
+`V7`: `sessions` ga `refresh_token_hash` + `previous_refresh_token_hash` (qisman
+unique index). Token — **JWT emas**, `SecureRandom` 256 bit, DB'da **SHA-256 hash**
+(bcrypt emas: 256 bit tasodifiy qiymatga brute force yo'q). Cookie:
+`REFRESH-TOKEN`, `Path=/api/v1/auth/refresh`, TTL `jwt.refresh-token-ttl: 3d`.
+
+Har `/auth/refresh` da **ikkala token ham yangilanadi**, `sid` o'zgarmaydi.
+Eski hash `previous_refresh_token_hash` ga ko'chadi va **tuzoq** bo'lib qoladi.
+
+⚠️ **Ikkita filter chain:** `@Order(1) publicChain` — `securityMatcher` bilan
+`/auth/login|register|refresh`, `oauth2ResourceServer` YO'Q. Sababi: muddati o'tgan
+`AUTH-TOKEN` cookie bu endpoint'larni **401 bilan to'sib qo'yardi** (`permitAll`
+autentifikatsiyani o'tkazib yubormaydi — credential bor, lekin yaroqsiz → 401).
+
+⚠️ **Tranzaksiya tuzog'i:** o'g'irlik aniqlanganda `revokeAllForUser` chaqirilib
+keyin exception tashlansa — `@Transactional` **rollback qiladi va bekor qilish
+bekor bo'ladi** (o'lchangan: UPDATE yuborilgan, DB o'zgarmagan). Yechim:
+`@Transactional(propagation = REQUIRES_NEW)` — xavfsizlik amali mustaqil commit qilsin.
+
+⚠️ **`yml` da vaqt birligi majburiy:** `3` = **3 millisekund** (o'lchangan:
+`exp - iat = 0`). `3d`, `15m`, `30s` deb yozing. Spring Boot `Duration` ga o'zi
+o'giradi — qo'lda parse qilish kerak emas.
+
+🟡 Cheklov: `previous_refresh_token_hash` faqat **bitta** oldingi token'ni eslaydi.
+Ikki rotatsiyadan keyin qayta ishlatilgan token oddiy "yaroqsiz" 401 oladi,
+o'g'irlik sifatida aniqlanmaydi. Hozircha maqbul.
 
 Qolgan: cookie sozlamalarini profildan olish (`CookieProperties`), refresh token
 (Faza 5 da `sessions` ga `refresh_token_hash` ustuni qo'shiladi).

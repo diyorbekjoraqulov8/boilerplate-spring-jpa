@@ -26,3 +26,4 @@ jwt:
   private-key: ${JWT_PRIVATE_KEY:classpath:keys/private.pem}
   issuer: project-v1
   access-token-ttl: 15m
+  refresh-token-ttl: 3d

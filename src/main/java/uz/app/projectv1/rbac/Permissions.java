@@ -18,5 +18,11 @@ public final class Permissions {
     public static final String CAN_UPDATE_USER = "hasAuthority('" + USER_UPDATE + "')";
     public static final String CAN_DELETE_USER = "hasAuthority('" + USER_DELETE + "')";
 
+    public static final String CAN_READ_ROLE   = "hasAuthority('" + ROLE_READ + "')";
+    public static final String CAN_CREATE_ROLE = "hasAuthority('" + ROLE_CREATE + "')";
+    public static final String CAN_UPDATE_ROLE = "hasAuthority('" + ROLE_UPDATE + "')";
+    public static final String CAN_DELETE_ROLE = "hasAuthority('" + ROLE_DELETE + "')";
+    public static final String CAN_ASSIGN_ROLE = "hasAuthority('" + ROLE_ASSIGN + "')";
+
     private Permissions() {}
 }

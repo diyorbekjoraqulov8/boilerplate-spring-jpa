@@ -2,8 +2,10 @@ package uz.app.projectv1.auth;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -11,18 +13,19 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import uz.app.projectv1.auth.dto.LoginRequest;
 import uz.app.projectv1.auth.dto.RegisterRequest;
+import uz.app.projectv1.auth.dto.SessionResponse;
 import uz.app.projectv1.common.exception.ConflictException;
 import uz.app.projectv1.rbac.RoleNames;
 import uz.app.projectv1.rbac.RoleRepository;
 import uz.app.projectv1.rbac.entity.Role;
-import uz.app.projectv1.security.CustomUserDetails;
-import uz.app.projectv1.security.JwtService;
-import uz.app.projectv1.security.SessionService;
+import uz.app.projectv1.security.*;
 import uz.app.projectv1.security.entity.Session;
 import uz.app.projectv1.user.UserRepository;
 import uz.app.projectv1.user.entity.UserEntity;
 
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -31,13 +34,25 @@ import java.util.UUID;
 public class AuthService {
 
     private final AuthenticationManager authenticationManager;
-    private final UserRepository userRepository;
-    private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+
     private final SessionService sessionService;
     private final JwtService jwtService;
 
-    public record LoginResult(String token, Duration ttl) {}
+    private final RefreshTokenService refreshTokenService;
+    private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
+    private final SessionRepository sessionRepository;
+
+    public record LoginResult(
+            String accessToken,
+            Duration accessTtl,
+            String refreshToken,
+            Duration refreshTtl
+    ) {}
+
+    @Value("${jwt.refresh-token-ttl}")
+    private Duration refreshTtl;
 
     @Transactional
     public void register(RegisterRequest request) {
@@ -69,20 +84,81 @@ public class AuthService {
 
         CustomUserDetails user = (CustomUserDetails) auth.getPrincipal();
 
+        String refreshToken = refreshTokenService.generate();
+
         Session session = sessionService.create(
                 user.id(),
                 httpRequest.getHeader("User-Agent"),
                 httpRequest.getRemoteAddr(),
-                Duration.ofDays(7)
+                refreshTtl,
+                refreshTokenService.hash(refreshToken)
         );
 
-        String token = jwtService.generate(user, session.getId());
+        String accessToken = jwtService.generate(user.id(), user.email(), session.getId());
 
-        return new LoginResult(token, jwtService.accessTokenTtl());
+        return new LoginResult(
+                accessToken,
+                jwtService.accessTokenTtl(),
+                refreshToken,
+                refreshTtl
+        );
+    }
+
+    @Transactional
+    public LoginResult refresh(String refreshToken) {
+        if (refreshToken == null) throw new BadCredentialsException("Refresh token yo'q");
+
+        String hash = refreshTokenService.hash(refreshToken);
+
+        sessionRepository.findByPreviousRefreshTokenHash(hash).ifPresent(stolen -> {
+            sessionService.revokeAllForUser(stolen.getUserId());
+            throw new BadCredentialsException("Refresh token qayta ishlatildi");
+        });
+
+        Session session = sessionRepository.findByRefreshTokenHash(hash)
+                .orElseThrow(() -> new BadCredentialsException("Refresh token yaroqsiz"));
+
+        if (session.getRevokedAt() != null || session.getExpiresAt().isBefore(LocalDateTime.now()))
+            throw new BadCredentialsException("Sessiya yaroqsiz");
+
+        UserEntity user = userRepository.findById(session.getUserId())
+            .orElseThrow(() -> new BadCredentialsException("Foydalanuvchi topilmadi"));
+
+        if (!user.isActive()) throw new BadCredentialsException("Foydalanuvchi faol emas");
+
+        String newRefreshToken = refreshTokenService.generate();
+        sessionService.rotate(session, refreshTokenService.hash(newRefreshToken));
+
+        String accessToken = jwtService.generate(user.getId(), user.getEmail(), session.getId());
+        return new LoginResult(
+                accessToken,
+                jwtService.accessTokenTtl(),
+                newRefreshToken,
+                refreshTtl
+        );
     }
 
     @Transactional
     public void logout(UUID sessionId) {
         sessionService.revoke(sessionId);
+    }
+
+    public List<SessionResponse> mySessions(AuthUser user) {
+        return sessionService.activeSessions(user.id()).stream()
+                .map(
+                    s -> new SessionResponse(
+                        s.getId(),
+                        s.getDevice(),
+                        s.getIp(),
+                        s.getCreatedDate(),
+                        s.getLastSeenAt(),
+                        s.getId().equals(user.sessionId()))
+                )
+                .toList();
+    }
+
+    @Transactional
+    public void revokeSession(AuthUser user, UUID sessionId) {
+        sessionService.revokeOwn(user.id(), sessionId);
     }
 }

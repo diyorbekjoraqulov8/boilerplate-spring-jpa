@@ -1,15 +1,18 @@
 package uz.app.projectv1.rbac.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import uz.app.projectv1.common.exception.ConflictException;
 import uz.app.projectv1.common.exception.NotFoundException;
 import uz.app.projectv1.rbac.PermissionRepository;
+import uz.app.projectv1.rbac.Permissions;
 import uz.app.projectv1.rbac.RoleRepository;
 import uz.app.projectv1.rbac.dto.RoleResponse;
 import uz.app.projectv1.rbac.dto.RoleResponseWithPermission;
 import uz.app.projectv1.rbac.dto.request.RoleRequest;
+import uz.app.projectv1.rbac.dto.request.RoleUpdateRequest;
 import uz.app.projectv1.rbac.entity.Permission;
 import uz.app.projectv1.rbac.entity.Role;
 import uz.app.projectv1.rbac.mapper.RoleMapper;
@@ -26,20 +29,24 @@ public class RoleService {
     private final RoleMapper roleMapper;
     private final PermissionRepository permissionRepository;
 
-    public List<?> getAll(boolean withPermission) {
-        if (withPermission) {
-            return this.roleMapper.toResponseWithPermissionList(this.roleRepository.findAllWithPermissions());
-        } else {
-            return this.roleMapper.toResponseList(this.roleRepository.findAll());
-        }
+    @PreAuthorize(Permissions.CAN_READ_ROLE)
+    public List<RoleResponse> getAll() {
+        return this.roleMapper.toResponseList(this.roleRepository.findAll());
     }
 
+    @PreAuthorize(Permissions.CAN_READ_ROLE)
+    public List<RoleResponseWithPermission> getAllWithPermissions() {
+        return this.roleMapper.toResponseWithPermissionList(this.roleRepository.findAllWithPermissions());
+    }
+
+    @PreAuthorize(Permissions.CAN_READ_ROLE)
     public RoleResponse getOne(Long id) {
         return this.roleRepository.findById(id)
                 .map(this.roleMapper::toResponse)
                 .orElseThrow(() -> new NotFoundException("Role", id));
     }
 
+    @PreAuthorize(Permissions.CAN_CREATE_ROLE)
     @Transactional
     public RoleResponse create(RoleRequest request) {
         String roleName = request.name().trim().toUpperCase();
@@ -61,24 +68,19 @@ public class RoleService {
         }
     }
 
+    @PreAuthorize(Permissions.CAN_UPDATE_ROLE)
     @Transactional
-    public RoleResponse update(Long id, RoleRequest request) {
-        Role findRole = this.roleRepository.findById(id)
+    public RoleResponse update(Long id, RoleUpdateRequest request) {
+        Role role = this.roleRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Role", id));
 
-        if (findRole.isSystemRole()) throw new ConflictException("System rolelarni yangilab bo'lmaydi: " + findRole.getName());
-        else {
-            Role newRole = new Role();
-            newRole.setDescription(request.description());
+        if (role.isSystemRole())
+            throw new ConflictException("System rolelarni yangilab bo'lmaydi: " + role.getName());
 
-            Set<Permission> perms = resolvePermissions(request.permissionIds());
+        role.setDescription(request.description());
+        role.setPermissions(resolvePermissions(request.permissionIds()));
 
-            newRole.setPermissions(perms);
-
-            this.roleRepository.save(newRole);
-
-            return roleMapper.toResponse(newRole);
-        }
+        return roleMapper.toResponse(role);        // save() KERAK EMAS
     }
 
     private Set<Permission> resolvePermissions(Set<Long> ids) {

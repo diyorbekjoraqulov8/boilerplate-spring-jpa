@@ -8,9 +8,13 @@ import uz.app.projectv1.security.entity.Session;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface SessionRepository extends JpaRepository<Session, UUID> {
+    Optional<Session> findByRefreshTokenHash(String hash);
+
+    Optional<Session> findByPreviousRefreshTokenHash(String hash);
 
     @Query("SELECT COUNT(s) > 0 FROM Session s " +
             "WHERE s.id = :id AND s.revokedAt IS NULL AND s.expiresAt > :now")
@@ -27,4 +31,7 @@ public interface SessionRepository extends JpaRepository<Session, UUID> {
     @Query("UPDATE Session s SET s.revokedAt = :now " +
             "WHERE s.userId = :userId AND s.revokedAt IS NULL")
     int revokeAllByUserId(@Param("userId") Long userId, @Param("now") LocalDateTime now);
+
+    List<Session> findAllByUserIdAndRevokedAtIsNullAndExpiresAtAfterOrderByCreatedDateDesc(
+            Long userId, LocalDateTime now);
 }

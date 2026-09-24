@@ -8,15 +8,18 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 import uz.app.projectv1.auth.dto.LoginRequest;
 import uz.app.projectv1.auth.dto.MeResponse;
 import uz.app.projectv1.auth.dto.RegisterRequest;
+import uz.app.projectv1.auth.dto.SessionResponse;
 import uz.app.projectv1.security.AuthUser;
 import uz.app.projectv1.security.CookieService;
 import uz.app.projectv1.security.JwtService;
 import uz.app.projectv1.security.SessionService;
+
+import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/auth")
@@ -41,12 +44,45 @@ public class AuthController {
             HttpServletResponse response
     ) {
         var result = this.authService.login(request, httpRequest);
+
         response.addHeader(
                 HttpHeaders.SET_COOKIE,
-                cookieService.auth(result.token(),
-                result.ttl()).toString()
+                cookieService.auth(
+                        result.accessToken(),
+                        result.accessTtl()
+                ).toString()
+        );
+        response.addHeader(
+                HttpHeaders.SET_COOKIE,
+                cookieService.refresh(
+                        result.refreshToken(),
+                        result.refreshTtl()
+                ).toString()
         );
 
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<Void> refresh(
+            @CookieValue(name = "REFRESH-TOKEN", required = false) String refreshToken,
+            HttpServletResponse response
+    ) {
+        var result = authService.refresh(refreshToken);
+        response.addHeader(
+                HttpHeaders.SET_COOKIE,
+                cookieService.auth(
+                        result.accessToken(),
+                        result.accessTtl()
+                ).toString()
+        );
+        response.addHeader(
+                HttpHeaders.SET_COOKIE,
+                cookieService.refresh(
+                        result.refreshToken(),
+                        result.refreshTtl()
+                ).toString()
+        );
         return ResponseEntity.noContent().build();
     }
 
@@ -56,12 +92,33 @@ public class AuthController {
             HttpServletResponse response
     ) {
         this.authService.logout(user.sessionId());
-        response.addHeader(HttpHeaders.SET_COOKIE, cookieService.clearAuth().toString());
+        response.addHeader(
+                HttpHeaders.SET_COOKIE,
+                cookieService.clearAuth().toString()
+        );
+        response.addHeader(
+                HttpHeaders.SET_COOKIE,
+                cookieService.clearRefresh().toString()
+        );
+
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/me")
     public MeResponse me(@AuthenticationPrincipal AuthUser user) {
         return new MeResponse(user.id(), user.email(), user.roles(), user.permissions());
+    }
+
+//    Sessions
+    @GetMapping("/sessions")
+    public List<SessionResponse> sessions(@AuthenticationPrincipal AuthUser user) {
+        return authService.mySessions(user);
+    }
+
+    @DeleteMapping("/sessions/{id}")
+    public ResponseEntity<Void> revokeSession(@AuthenticationPrincipal AuthUser user,
+                                              @PathVariable UUID id) {
+        authService.revokeSession(user, id);
+        return ResponseEntity.noContent().build();
     }
 }

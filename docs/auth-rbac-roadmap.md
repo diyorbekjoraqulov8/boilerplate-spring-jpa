@@ -46,8 +46,8 @@ Narx (o'lchangan): sessiya 0.06 ms + user/rol/permission 0.19 ms = **~0.25 ms**,
 - [ ] **Faza 4** — JWT: RSA kalitlar, JwtEncoder/JwtDecoder, claim → authority
 - [x] **Faza 5A** — register / login / logout / me ✅ 2026-09-20
 - [ ] **Faza 4.5** — Huquqlarni token'dan DB'ga ko'chirish (`DbAuthenticationConverter`) ← **HOZIR**
-- [ ] **Faza 5B** — Refresh token: `sessions` ga `refresh_token_hash` (V7), rotatsiya, o'g'irlikni aniqlash
-- [ ] **Faza 5C** — `GET /auth/sessions`, `DELETE /auth/sessions/{id}` — faol seanslar
+- [x] **Faza 5B** — Refresh token (V7), rotatsiya, o'g'irlikni aniqlash ✅ 2026-09-23
+- [ ] **Faza 5C** — `GET /auth/sessions`, `DELETE /auth/sessions/{id}` — faol seanslar ← **HOZIR**
 - [ ] **Faza 5D** — `CookieCsrfEnforcementFilter` + `login`/`register` uchun alohida filter chain
 - [ ] **Faza 6** — Authorization: `@PreAuthorize`, permission-based tekshiruv
 - [ ] **Faza 7** — Production hardening: profillar, rate limit, CORS, testlar

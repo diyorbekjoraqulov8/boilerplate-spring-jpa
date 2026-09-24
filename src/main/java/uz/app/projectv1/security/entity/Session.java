@@ -24,6 +24,12 @@ public class Session {
     private String device;
     private String ip;
 
+    @Column(name = "refresh_token_hash", length = 64)
+    private String refreshTokenHash;
+
+    @Column(name = "previous_refresh_token_hash", length = 64)
+    private String previousRefreshTokenHash;
+
     @Column(name = "created_date", nullable = false)
     private LocalDateTime createdDate;
 

@@ -20,21 +20,21 @@ public class JwtService {
     @Value("${jwt.issuer}") private String issuer;
     @Value("${jwt.access-token-ttl}") private Duration ttl;
 
-    public String generate(CustomUserDetails user, UUID sessionId) {
+    public String generate(Long userId, String email, UUID sessionId) {
         Instant now = Instant.now();
 
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer(issuer)
                 .issuedAt(now)
                 .expiresAt(now.plus(ttl))
-                .subject(String.valueOf(user.id()))
+                .subject(String.valueOf(userId))
                 .id(UUID.randomUUID().toString())
-                .claim("email", user.email())
+                .claim("email", email)
                 .claim("sid", sessionId.toString())
                 .build();
 
         return jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
     }
 
-    public Duration accessTokenTtl() { return ttl; }
+    public Duration accessTokenTtl() { return this.ttl; }
 }
