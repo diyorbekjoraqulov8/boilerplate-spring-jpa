@@ -80,7 +80,7 @@ public class RoleService {
         role.setDescription(request.description());
         role.setPermissions(resolvePermissions(request.permissionIds()));
 
-        return roleMapper.toResponse(role);        // save() KERAK EMAS
+        return roleMapper.toResponse(role);
     }
 
     private Set<Permission> resolvePermissions(Set<Long> ids) {

@@ -1,7 +1,16 @@
 spring:
   jpa:
-    show-sql: true
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+logging:
+  level:
+    uz.app.projectv1: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
 app:
   cookie:
     secure: false
-    same-site: Strict

@@ -9,17 +9,18 @@ spring:
     driver-class-name: org.postgresql.Driver
 
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: validate
-    properties:
-      hibernate:
-        format_sql: true
 
   profiles:
     default: dev
 
 server:
   port: 8081
+  error:
+    include-stacktrace: never
+    include-message: never
 
 jwt:
   public-key: classpath:keys/public.pem
@@ -27,3 +28,8 @@ jwt:
   issuer: project-v1
   access-token-ttl: 15m
   refresh-token-ttl: 3d
+
+app:
+  cookie:
+    secure: true
+    same-site: Strict

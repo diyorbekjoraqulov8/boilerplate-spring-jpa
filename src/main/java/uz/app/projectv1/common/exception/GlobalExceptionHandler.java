@@ -1,6 +1,7 @@
 package uz.app.projectv1.common.exception;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.*;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
@@ -87,6 +88,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             pd.setProperty("timestamp", Instant.now());
         }
         return response;
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ProblemDetail handleDataIntegrity(DataIntegrityViolationException ex) {
+        log.warn("Ma'lumot yaxlitligi buzildi: {}", ex.getMostSpecificCause().getMessage());
+        return build(HttpStatus.CONFLICT, "CONFLICT", "Bunday yozuv allaqachon mavjud");
     }
 
     /**

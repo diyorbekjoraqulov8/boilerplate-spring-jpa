@@ -30,11 +30,14 @@ Narx (o'lchangan): sessiya 0.06 ms + user/rol/permission 0.19 ms = **~0.25 ms**,
 
 | # | Savol | Holat |
 |---|---|---|
-| 1 | **CSRF** — `oauth2ResourceServer` uni cookie'dagi token uchun jimgina o'chiradi (o'lchangan) | ❌ `CookieCsrfEnforcementFilter` yozilishi kerak. Hozir sozlama bor, ishlamaydi |
+| 1 | ~~**CSRF** — `oauth2ResourceServer` uni cookie'dagi token uchun jimgina o'chiradi~~ | ✅ `CookieCsrfEnforcementFilter` (Faza 5D), `MessageDigest.isEqual` bilan |
 | 2 | ~~Rol o'zgarganda token'ni bekor qilish~~ | ✅ **hal bo'ldi** — huquq token'da emas |
-| 3 | **`login`/`register` da eski cookie 401 beradi** | ❌ alohida `SecurityFilterChain` + `securityMatcher` |
+| 3 | ~~**`login`/`register` da eski cookie 401 beradi**~~ | ✅ `@Order(1) publicChain` + `securityMatcher` |
 | 4 | **Har so'rovda 2 ta DB so'rovi** (~0.25 ms) | 🟡 qoldiriladi; Faza 7 da o'lchab cache ko'riladi |
 | 5 | ~~Clock skew 60s~~ | ✅ 4-qadamda `JwtTimestampValidator(5s)` bilan hal bo'ldi |
+| 6 | **`role:delete` huquqi bor, kodi yo'q** — `RoleService.delete()` va `DELETE /roles/{id}` yozilmagan | ❌ orphan permission; spetsifikatsiya berilgan (2026-09-25) |
+| 7 | **Login javobida `XSRF-TOKEN` cookie kelmaydi** — `publicChain` da CSRF o'chirilgan | 🟡 mijoz login'dan keyin bitta `GET` qilishi shart; Faza 7 da tuzatiladi |
+| 8 | **`handleDataIntegrity` xabari faqat "duplicate" deydi** — FK/NOT NULL ham shu yerga tushadi | 🟡 xabar umumiylashtirilsin |
 
 ## Progress
 
@@ -42,15 +45,22 @@ Narx (o'lchangan): sessiya 0.06 ms + user/rol/permission 0.19 ms = **~0.25 ms**,
 - [x] **Faza 1** — Domen: Role + Permission entity'lar, RBAC modeli ✅ 2026-09-13
 - [x] **Faza 2** — Migration: Flyway + seed data ✅ 2026-09-17
 - [x] **Faza 2.5** — Sirlarni env'ga chiqarish ✅ 2026-09-19
-- [ ] **Faza 3** — Security infra: PasswordEncoder, UserDetails, UserDetailsService
-- [ ] **Faza 4** — JWT: RSA kalitlar, JwtEncoder/JwtDecoder, claim → authority
+- [x] **Faza 3** — Security infra: PasswordEncoder, UserDetails, UserDetailsService ✅ 2026-09-19
+- [x] **Faza 4** — JWT: RSA kalitlar, JwtEncoder/JwtDecoder, cookie'dan token ✅ 2026-09-20
 - [x] **Faza 5A** — register / login / logout / me ✅ 2026-09-20
-- [ ] **Faza 4.5** — Huquqlarni token'dan DB'ga ko'chirish (`DbAuthenticationConverter`) ← **HOZIR**
+- [x] **Faza 4.5** — Huquqlarni token'dan DB'ga ko'chirish (`DbAuthenticationConverter`) ✅ 2026-09-23
 - [x] **Faza 5B** — Refresh token (V7), rotatsiya, o'g'irlikni aniqlash ✅ 2026-09-23
-- [ ] **Faza 5C** — `GET /auth/sessions`, `DELETE /auth/sessions/{id}` — faol seanslar ← **HOZIR**
-- [ ] **Faza 5D** — `CookieCsrfEnforcementFilter` + `login`/`register` uchun alohida filter chain
-- [ ] **Faza 6** — Authorization: `@PreAuthorize`, permission-based tekshiruv
-- [ ] **Faza 7** — Production hardening: profillar, rate limit, CORS, testlar
+- [x] **Faza 5C** — `GET /auth/sessions`, `DELETE /auth/sessions/{id}` — faol seanslar ✅ 2026-09-23
+- [x] **Faza 5D** — `CookieCsrfEnforcementFilter` + `login`/`register` uchun alohida filter chain ✅ 2026-09-24
+- [x] **Faza 6** — Authorization: `@PreAuthorize`, permission-based tekshiruv ✅ 2026-09-25
+      (qoldi: `RoleService.delete()` + `DELETE /roles/{id}` — OCHIQ QARORLAR #6)
+- [ ] **Faza 7** — Production hardening (beshta bo'lak):
+  - [x] **7A** — Konfiguratsiya gigiyenasi: profillar, `open-in-view`, Hikari pool, log ✅ 2026-09-26
+  - [x] **7B** — Xavfsizlik header'lari: CSP, Referrer-Policy, Permissions-Policy, HSTS + `forward-headers-strategy` (CORS ataylab yo'q — ADR #22) ✅ 2026-09-26
+  - [ ] **7C** — Brute-force / rate limit ← **HOZIR**
+  - [ ] **7D** — Audit log
+  - [ ] **7E** — Testlar (Testcontainers + `@WithMockUser`)
+- [ ] **Faza 8** — Deployment: ahost.uz hosting + domen, backend va frontend yuklash, nginx
 
 ---
 
@@ -989,6 +999,50 @@ Ushbular tugagach qilinadi, oldin emas:
 
 ---
 
+# FAZA 8 — Deployment (eng oxirida)
+
+Loyiha tayyor bo'lganda qilinadi. Foydalanuvchi **ahost.uz** dan hosting va domen
+oladi, backend va frontend shu serverga yuklanadi.
+
+## ⚠️ Bu fazani boshlashdan OLDIN majburiy tushuntirish
+
+Kodga tegishdan avval quyidagilar tushuntirilishi kerak — **nega** degan savolga
+javob bo'lmasa, nginx shunchaki "ko'chirib qo'yilgan konfiguratsiya" bo'lib qoladi:
+
+1. **nginx nima uchun kerak** — reverse proxy tushunchasi, TLS termination,
+   statik fayllarni berish, bitta origin yasash.
+2. **Agar nginx bo'lmasa nimalar BO'LMAYDI** — har birini aniq oqibati bilan:
+   - HTTPS bo'lmaydi → `secure` cookie ishlamaydi → JWT ochiq HTTP'da ketadi
+   - Frontend va backend **har xil origin**da bo'ladi → CORS majburiy bo'ladi →
+     `SameSite=Strict` dan `None` ga tushish kerak → CSRF himoyasining birinchi
+     qatlami yo'qoladi (ADR #22 ning teskarisi)
+   - Spring Boot to'g'ridan-to'g'ri internetga chiqadi → `server.address: 127.0.0.1`
+     ning ma'nosi qolmaydi, 8081 port tashqaridan ochiq
+   - `X-Forwarded-Proto` bo'lmaydi → HSTS **hech qachon** chiqmaydi (7B jim o'ladi)
+   - `X-Real-IP` bo'lmaydi → rate limit va brute-force himoyasi IP'ni ajrata olmaydi
+   - Statik faylni Spring beradi → sekin, keshsiz, gzip'siz
+   - Nol uzilishli deploy yo'q, bir vaqtda ikki ilova ko'tarib bo'lmaydi
+
+## Faza 8 mazmuni
+
+- [ ] ahost.uz: hosting turi (VPS kerak — shared hosting'da Java ishlamaydi), domen, DNS A-record
+- [ ] Serverni tayyorlash: JDK 26, PostgreSQL, foydalanuvchi, `ufw`
+- [ ] `./gradlew bootJar` → `systemd` unit fayli (avtomatik restart, env o'zgaruvchilar)
+- [ ] `DB_PASSWORD`, `JWT_PRIVATE_KEY` va h.k. ni serverda xavfsiz saqlash
+- [ ] Frontend build → `/var/www/`
+- [ ] nginx: HTTP→HTTPS, `/` → statik SPA, `/api/**` → `127.0.0.1:8081`
+- [ ] `proxy_pass` da **slash yo'q** (yo'l kesilmasin — refresh cookie `Path`i buziladi)
+- [ ] `X-Forwarded-Proto` / `X-Real-IP` / `X-Forwarded-For`
+- [ ] certbot (Let's Encrypt) + avtomatik yangilash
+- [ ] `server.address: 127.0.0.1` + `ufw deny 8081`
+- [ ] Flyway migratsiyalarini prodda ishga tushirish tartibi
+- [ ] Tekshirish: tashqaridan 8081 yopiq, HSTS chiqadi, haqiqiy mijoz IP'si log'da
+
+> Tayyor nginx konfiguratsiyasi va tekshirish buyruqlari 2026-09-26 sessiyasida
+> bir marta yozilgan — o'sha payt qayta keltiriladi.
+
+---
+
 # Qarorlar jurnali (ADR)
 
 Arxitektura qarorlari shu yerga yoziladi — "nega bunday qilganmiz" savoli
@@ -1009,3 +1063,13 @@ olti oydan keyin ham javobsiz qolmasin.
 | 11 | 2026-09-19 | CSRF uchun `CsrfTokenRequestAttributeHandler` + `setCsrfRequestAttributeName(null)` | Security 6+ default `XorCsrfTokenRequestAttributeHandler` cookie'dagi **xom** token bilan mos kelmaydi → double-submit ishlamaydi (o'lchandi: 403). Plain handler bilan 405 (o'tdi). XOR faqat token HTML tanasiga chizilganda kerak — JSON API'da emas |
 | 12 | 2026-09-20 | Token'ni bekor qilish uchun **`sid` + `sessions` jadvali** (`token_version` emas) | Bir xil narx (+1 so'rov/request, o'lchandi: 1→2), lekin ko'proq imkoniyat: qurilma bo'yicha chiqarish, "faol seanslarim", rol o'zgarganda hammasini bekor qilish. `token_version` faqat oxirgisini bera olardi |
 | 13 | 2026-09-20 | Access token'ni DB'da saqlash **rad etildi** | Bitta qurilma bilan cheklaydi; token — bearer credential, xom saqlash parolni ochiq saqlashga teng; baribir har so'rovda DB o'qiladi. Sessiya id saqlash barcha foydani beradi, kamchiliklarsiz |
+| 14 | 2026-09-25 | `@PreAuthorize` **service** qatlamiga qo'yiladi, controller'ga emas | Service'ni boshqa controller, scheduler yoki consumer ham chaqirishi mumkin — himoya bitta joyda qoladi. Tekshirildi: `AuthorizationInterceptorsOrder.PRE_AUTHORIZE = 200`, tranzaksiya advisor `LOWEST_PRECEDENCE` → **huquq avval, tranzaksiya keyin**; rad etilgan so'rov DB ulanishini olmaydi |
+| 15 | 2026-09-25 | SpEL ifodalari `Permissions` da **konstanta** sifatida (`CAN_READ_ROLE = "hasAuthority('role:read')"`) | `@PreAuthorize` ichidagi satr runtime'da baholanadi — typo bo'lsa endpoint jimgina hech kimga ochilmaydi, xato chiqmaydi. Konstanta bilan kompilyator tutadi |
+| 16 | 2026-09-25 | `USER` rolidan `user:read` olib tashlandi (V8) | Oddiy user butun `GET /users` ro'yxatini ko'rishi xavfsizlik nuqsoni edi; endi faqat o'zini ko'radi (`#id == authentication.principal.id`). Yon foyda: egalik sharti sinaladigan bo'ldi |
+| 17 | 2026-09-25 | Nomni yangilash uchun alohida `RoleUpdateRequest` (name'siz) | Rol nomi RBAC kaliti — `hasRole('ADMIN')` unga tayanadi. Nomni PUT bilan o'zgartirish jimgina huquqlarni buzadi. Nom o'zgarmas, faqat `description` + `permissionIds` |
+| 18 | 2026-09-26 | `open-in-view: false` **bazaga** (`application.yml`), prod'ga emas | Dev'da yoqiq / prod'da o'chiq bo'lsa lazy nuqson faqat prodda portlaydi (12-Factor: dev/prod parity). Tekshirildi: barcha repository o'qishlari `@EntityGraph` bilan va mapping `@Transactional` ichida → xavfsiz |
+| 19 | 2026-09-26 | Cookie sozlamalari uchun **xavfsiz default** (`application.yml` da `secure: true`, `same-site: Strict`), dev bo'shashtiradi | `SPRING_PROFILES_ACTIVE=prod` unutilsa `default: dev` yoqilib cookie `Secure`siz chiqardi — jim xavf. Fail-safe: xato yuz berganda qattiq holat qolsin |
+| 20 | 2026-09-26 | `show-sql: true` **rad etildi**, o'rniga `logging.level.org.hibernate.SQL: DEBUG` | `show-sql` to'g'ridan-to'g'ri `System.out` ga yozadi — vaqt belgisi, thread, MDC (`requestId`) yo'q, log fayliga tushmaydi, log darajasi bilan boshqarilmaydi |
+| 21 | 2026-09-26 | `@ConfigurationProperties` + **`@Validated`** + `@NotBlank`/`@Pattern` | Boot 4.1.1 bytecode'idan tasdiqlandi: JSR-303 validator faqat `jsr303Present && Bindable.getAnnotation(Validated.class) != null` bo'lganda qo'shiladi. `@Validated` bo'lmasa constraint'lar **jimgina** e'tiborsiz qoladi va yo'q sozlama `null` bo'lib o'tib ketadi |
+| 22 | 2026-09-26 | **CORS sozlanmaydi** — frontend dev proxy, prod'da bitta origin (nginx: `/` → static, `/api/**` → Boot) | Proxy orqali brauzer uchun so'rov same-origin bo'ladi, CORS umuman qo'llanmaydi. Asosiy foyda: `SameSite=Strict` saqlanadi (cross-origin bo'lsa `None` + `Secure` ga tushish kerak edi va CSRF himoyasining birinchi qatlami yo'qolardi). Preflight kechikishi ham yo'q. Alohida domenga o'tilsa — `CorsProperties` + `corsConfigurationSource` + `.cors()` **ikkala** zanjirga (`securityMatcher` yo'lni metodga qaramay ushlaydi, ya'ni `OPTIONS /auth/login` `publicChain` ga tushadi) |
+| 23 | 2026-09-26 | Env'dan keladigan sozlamaga `@NotBlank`/`@NotEmpty` emas, **`@Pattern`** (shakl tekshiruvi) | Tekshirildi: `PropertySourcesPlaceholdersResolver` `PropertyPlaceholderHelper` ni `ignoreUnresolvablePlaceholders = true` bilan yasaydi (Boot 4.1.1 bytecode). Yechilmagan `${VAR}` **literal satr** bo'lib bog'lanadi — u bo'sh emas, shuning uchun `@NotBlank`/`@NotEmpty` **o'tadi** va nuqson jim qoladi |

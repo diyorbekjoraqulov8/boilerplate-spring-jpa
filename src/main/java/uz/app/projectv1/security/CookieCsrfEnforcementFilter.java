@@ -8,6 +8,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.Set;
 
@@ -35,10 +37,11 @@ public class CookieCsrfEnforcementFilter extends OncePerRequestFilter {
         String cookieToken = cookie(request, CSRF_COOKIE);
         String headerToken = request.getHeader(CSRF_HEADER);
 
-        if (cookieToken == null || !cookieToken.equals(headerToken)) {
-            reject(response);
-            return;
-        }
+        boolean valid = cookieToken != null && headerToken != null
+                && MessageDigest.isEqual(
+                cookieToken.getBytes(StandardCharsets.UTF_8),
+                headerToken.getBytes(StandardCharsets.UTF_8));
+        if (!valid) { reject(response); return; }
 
         chain.doFilter(request, response);
     }

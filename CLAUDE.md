@@ -111,7 +111,7 @@ Har feature ichida: `XController`, `XService`, `XRepository`, `entity/`, `dto/`.
 
 ---
 
-## 3. HOZIRGI HOLAT (2026-09-10)
+## 3. HOZIRGI HOLAT (2026-09-25)
 
 **✅ Faza 0 tugadi** — kod yozildi, review qilindi, ishlab turgan ilovada tekshirildi.
 
@@ -278,14 +278,53 @@ klassi **ichidagi metod**, alohida klass emas.
 ⚠️ **`@Value` importi:** `org.springframework.beans.factory.annotation.Value`.
 `lombok.Value` — klass annotatsiyasi, `Cannot find @interface method 'value()'` beradi.
 
-Hali yo'q: refresh token, `@PreAuthorize`, register/login/logout.
+**✅ Faza 5C/5D tugadi** (2026-09-24) — `GET /auth/sessions`,
+`DELETE /auth/sessions/{id}` (IDOR'ga qarshi **404**, 403 emas — begona sessiya
+borligini ham oshkor qilmaslik uchun) + `CookieCsrfEnforcementFilter`.
 
-⚠️ Ikki vaqtinchalik narsa Faza 3 da tuzatiladi:
-- `SecurityConfig` da `/api/v1/users/**` → `permitAll`
-- CSRF yoqiq → hozir har qanday POST/PUT/DELETE **403** qaytaradi
+⚠️ **CSRF jimgina o'chib qolgan edi:** `oauth2ResourceServer` CSRF'ning
+"himoya talab qiladigan" matcher'iga `BearerTokenRequestMatcher` **istisno** qo'shadi.
+Bizning `BearerTokenResolver` token'ni cookie'dan o'qigani uchun *har* so'rov shu
+istisnoga tushib, `CsrfFilter` ularni tekshirmay o'tkazib yuborardi (o'lchangan:
+`POST /auth/logout` CSRF token'siz **204**). Yechim — `addFilterAfter(new
+CookieCsrfEnforcementFilter(), CsrfFilter.class)`: `AUTH-TOKEN` cookie bor va metod
+xavfsiz emas bo'lsa, `XSRF-TOKEN` cookie ↔ `X-XSRF-TOKEN` header'ni qo'lda
+solishtiradi (`MessageDigest.isEqual` — doimiy vaqtli).
+
+**✅ Faza 6 tugadi** (2026-09-25) — `@EnableMethodSecurity` + `@PreAuthorize`.
+
+- SpEL ifodalari `rbac/Permissions` da konstanta (`CAN_READ_ROLE` va h.k.) —
+  `@PreAuthorize` satri runtime'da baholanadi, typo **jimgina** endpoint'ni
+  hech kimga ochmay qo'yadi; konstanta bilan kompilyator tutadi.
+- `@PreAuthorize` **service** qatlamida, controller'da emas.
+- Egalik: `CAN_READ_USER + " or #id == authentication.principal.id"` — SpEL
+  `AuthUser` record'ining accessor'ini o'qiy oladi (Spring Framework 7 da tekshirilgan).
+- `V8` — `USER` rolidan `user:read` olib tashlandi. Aks holda egalik sharti
+  hech qachon ishga tushmasdi (`or` ning chap tomoni doim `true` edi) va oddiy
+  user butun `GET /users` ro'yxatini ko'rardi.
+
+O'lchangan tartib: `AuthorizationInterceptorsOrder.PRE_AUTHORIZE = 200`,
+tranzaksiya advisor esa `LOWEST_PRECEDENCE` → **huquq avval tekshiriladi,
+tranzaksiya keyin ochiladi**; rad etilgan so'rov DB ulanishini umuman olmaydi.
+
+`@PreAuthorize` rad etsa `AuthorizationDeniedException` tashlanadi — u
+`AccessDeniedException` dan meros oladi (7.1.1 jar'dan tasdiqlangan), shuning uchun
+mavjud `GlobalExceptionHandler.handleAccessDenied` uni tutib **403 ProblemDetail** beradi.
+
+Rol huquqlari (V3 + V8 dan keyin, toza DB'da tekshirilgan):
+
+| Rol | Huquqlar |
+|---|---|
+| ADMIN | `user:*`, `role:*` |
+| MANAGER | `user:read`, `user:update`, `role:read` |
+| OPERATOR | `user:read`, `user:update` |
+| USER | — (faqat o'zini ko'radi) |
+
+🟡 **Qolgan ish:** `role:delete` huquqi ADMIN'da bor, lekin `RoleService.delete()`
+va `DELETE /roles/{id}` yozilmagan — "orphan permission". Roadmap: OCHIQ QARORLAR #6.
 
 ⚠️ Windows va macOS DB'larida `users` jadvali **har xil** chiqdi (`role` ustuni
 biryerda nullable, biryerda not null) — `ddl-auto: update` mavjud ustunni
 o'zgartirmaydi. Bu Faza 2 (Flyway) ning tirik dalili.
 
-Keyingi qadam: `docs/auth-rbac-roadmap.md` → Faza 1 (Role + Permission).
+Keyingi qadam: `docs/auth-rbac-roadmap.md` → **Faza 7** (production hardening).
