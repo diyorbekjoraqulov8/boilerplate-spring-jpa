@@ -13,6 +13,8 @@ public final class Permissions {
     public static final String ROLE_DELETE = "role:delete";
     public static final String ROLE_ASSIGN = "role:assign";
 
+    public static final String AUDIT_READ = "audit:read";
+
     public static final String CAN_READ_USER   = "hasAuthority('" + USER_READ + "')";
     public static final String CAN_CREATE_USER = "hasAuthority('" + USER_CREATE + "')";
     public static final String CAN_UPDATE_USER = "hasAuthority('" + USER_UPDATE + "')";
@@ -23,6 +25,8 @@ public final class Permissions {
     public static final String CAN_UPDATE_ROLE = "hasAuthority('" + ROLE_UPDATE + "')";
     public static final String CAN_DELETE_ROLE = "hasAuthority('" + ROLE_DELETE + "')";
     public static final String CAN_ASSIGN_ROLE = "hasAuthority('" + ROLE_ASSIGN + "')";
+
+    public static final String CAN_READ_AUDIT   = "hasAuthority('" + AUDIT_READ + "')";
 
     private Permissions() {}
 }

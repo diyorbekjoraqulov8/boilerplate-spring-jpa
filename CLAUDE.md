@@ -111,7 +111,7 @@ Har feature ichida: `XController`, `XService`, `XRepository`, `entity/`, `dto/`.
 
 ---
 
-## 3. HOZIRGI HOLAT (2026-09-25)
+## 3. HOZIRGI HOLAT (2026-09-27)
 
 **✅ Faza 0 tugadi** — kod yozildi, review qilindi, ishlab turgan ilovada tekshirildi.
 
@@ -179,9 +179,14 @@ paroli `Parol12345`, `{bcrypt}` prefiksli hash bilan seed qilingan.
 Migration'larni ilovani ko'tarmasdan tekshirish:
 ```bash
 dropdb --if-exists mig_test; createdb mig_test
-for f in src/main/resources/db/migration/V*.sql; do psql -q -d mig_test -f "$f"; done
+for f in $(ls src/main/resources/db/migration/V*.sql | sort -V); do
+  psql -q -v ON_ERROR_STOP=1 -d mig_test -f "$f"
+done
 dropdb mig_test
 ```
+⚠️ **`sort -V` shart.** Oddiy glob leksikografik tartib beradi va `V10` `V2` dan
+oldin ketadi → soxta xatolar. Flyway o'zi versiyani raqamli solishtiradi, muammo
+faqat qo'lda sinashda.
 
 **✅ Faza 2.5 tugadi** (2026-09-19) — sirlar env'da:
 ```yaml
@@ -327,4 +332,47 @@ va `DELETE /roles/{id}` yozilmagan — "orphan permission". Roadmap: OCHIQ QAROR
 biryerda nullable, biryerda not null) — `ddl-auto: update` mavjud ustunni
 o'zgartirmaydi. Bu Faza 2 (Flyway) ning tirik dalili.
 
-Keyingi qadam: `docs/auth-rbac-roadmap.md` → **Faza 7** (production hardening).
+**✅ Faza 7A–7D tugadi** (2026-09-26 / 27):
+
+- **7A** konfiguratsiya gigiyenasi — `open-in-view: false` **bazada** (prodda emas:
+  dev/prod parity), Hikari pool, `logging.level.org.hibernate.SQL: DEBUG`
+  (`show-sql` emas — u `System.out` ga yozadi, MDC/vaqt belgisi yo'q),
+  cookie uchun **xavfsiz default** (`application.yml` da `secure: true`, dev bo'shashtiradi).
+- **7B** xavfsizlik header'lari — CSP `default-src 'none'; frame-ancestors 'none'`,
+  `Referrer-Policy: no-referrer`, `Permissions-Policy`, HSTS.
+  **CORS ataylab sozlanmagan** — frontend dev proxy + prodda bitta origin
+  (ADR #22). Shu tufayli `SameSite=Strict` saqlanadi.
+- **7C** brute-force — `users.failed_attempts` / `locked_until` (V9),
+  `UserDetails.isAccountNonLocked()`, `LoginAttemptService` (`REQUIRES_NEW`).
+  IP bo'yicha limit → nginx (Faza 8).
+- **7D** audit log — `audit_logs` (V10), fluent `AuditService.event(...)...record()`,
+  11 ta event, `GET /api/v1/audit` (`audit:read`, sahifalangan).
+
+### ⚠️ Umumlashtirilgan tuzoq: annotatsiya yozilgan, lekin ishlamaydi
+
+Spring'da bir necha annotatsiya **shartsiz jimgina** e'tiborsiz qoladi. Uchrashganlari:
+
+| Annotatsiya | Ishlashi uchun kerak | Bo'lmasa |
+|---|---|---|
+| `@PreAuthorize` | `@EnableMethodSecurity` | endpoint hammaga ochiq |
+| `@NotBlank` / `@Pattern` (`@ConfigurationProperties` da) | `@Validated` | yo'q sozlama `null` bo'lib o'tadi |
+| `@Transactional` | metod **`public`** bo'lishi | tranzaksiya umuman yo'q |
+| `@Transactional` / `@PreAuthorize` / `@Cacheable` | proxy orqali chaqirilishi | self-invocation'da ishlamaydi |
+| `.cors()` / `.headers()` | **har bir** `SecurityFilterChain` da | boshqa zanjirda yo'q |
+
+Hammasi **xato bermaydi**. Yangi xavfsizlik/tranzaksiya annotatsiyasi qo'shganda
+birinchi ish — uni **buzib sinash** (yo'q qilib, kutilgan xato chiqishini ko'rish).
+
+### O'lchangan narx (2026-09-27)
+
+| So'rov | DB so'rovlari |
+|---|---|
+| `GET /users` (JWT) | 3 |
+| `GET /auth/me` | 2 |
+| `GET /roles/detailed` | 1 (`@EntityGraph`) |
+| JWT so'rovda ortiqcha audit/login `UPDATE` | **0** (ADR #28) |
+
+`ip` ustuni lokalda `0:0:0:0:0:0:0:1` (IPv6 loopback) — `VARCHAR(45)` qarori
+o'zini oqladi, `VARCHAR(15)` kesib tashlardi.
+
+Keyingi qadam: `docs/auth-rbac-roadmap.md` → **Faza 7E** (testlar).

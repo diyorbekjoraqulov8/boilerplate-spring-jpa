@@ -4,6 +4,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import uz.app.projectv1.audit.AuditEvent;
+import uz.app.projectv1.audit.AuditService;
+import uz.app.projectv1.audit.entity.AuditLog;
 import uz.app.projectv1.common.exception.ConflictException;
 import uz.app.projectv1.common.exception.NotFoundException;
 import uz.app.projectv1.rbac.PermissionRepository;
@@ -19,7 +22,9 @@ import uz.app.projectv1.rbac.mapper.RoleMapper;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +33,7 @@ public class RoleService {
     private final RoleRepository roleRepository;
     private final RoleMapper roleMapper;
     private final PermissionRepository permissionRepository;
+    private final AuditService auditService;
 
     @PreAuthorize(Permissions.CAN_READ_ROLE)
     public List<RoleResponse> getAll() {
@@ -64,6 +70,11 @@ public class RoleService {
 
             this.roleRepository.save(newRole);
 
+            auditService.event(AuditEvent.ROLE_CREATED)
+                    .target("ROLE", newRole.getId())
+                    .detail("roleName", roleName)
+                    .record();
+
             return roleMapper.toResponse(newRole);
         }
     }
@@ -77,8 +88,20 @@ public class RoleService {
         if (role.isSystemRole())
             throw new ConflictException("System rolelarni yangilab bo'lmaydi: " + role.getName());
 
+        Set<String> oldPerms = role.getPermissions().stream().map(Permission::getName)
+                .collect(Collectors.toSet());
+
+        Set<Long> newPerms = request.permissionIds() == null ? Set.of() : request.permissionIds();
+
         role.setDescription(request.description());
         role.setPermissions(resolvePermissions(request.permissionIds()));
+
+        auditService.event(AuditEvent.ROLE_UPDATED)
+                .target("ROLE", id)
+                .detail("roleName", role.getName())
+                .detail("permissionsBefore", oldPerms)
+                .detail("permissionsAfter", newPerms)
+                .record();
 
         return roleMapper.toResponse(role);
     }

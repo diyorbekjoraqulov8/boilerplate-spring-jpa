@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import uz.app.projectv1.audit.AuditEvent;
+import uz.app.projectv1.audit.AuditService;
 import uz.app.projectv1.common.exception.NotFoundException;
 import uz.app.projectv1.rbac.Permissions;
 import uz.app.projectv1.user.dto.UserResponse;
@@ -18,6 +20,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final UserMapper userMapper;
+    private final AuditService auditService;
 
     @PreAuthorize(Permissions.CAN_READ_USER + " or #id == authentication.principal.id")
     public UserResponse getById(Long id) {
@@ -43,6 +46,8 @@ public class UserService {
     public void delete(Long id) {
         UserEntity user = userRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Foydalanuvchi", id));
+
+        auditService.event(AuditEvent.USER_DELETED).target("USER", id).record();
         userRepository.delete(user);
     }
 }

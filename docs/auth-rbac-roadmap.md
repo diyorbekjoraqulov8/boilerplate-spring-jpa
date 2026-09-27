@@ -38,6 +38,8 @@ Narx (o'lchangan): sessiya 0.06 ms + user/rol/permission 0.19 ms = **~0.25 ms**,
 | 6 | **`role:delete` huquqi bor, kodi yo'q** — `RoleService.delete()` va `DELETE /roles/{id}` yozilmagan | ❌ orphan permission; spetsifikatsiya berilgan (2026-09-25) |
 | 7 | **Login javobida `XSRF-TOKEN` cookie kelmaydi** — `publicChain` da CSRF o'chirilgan | 🟡 mijoz login'dan keyin bitta `GET` qilishi shart; Faza 7 da tuzatiladi |
 | 8 | **`handleDataIntegrity` xabari faqat "duplicate" deydi** — FK/NOT NULL ham shu yerga tushadi | 🟡 xabar umumiylashtirilsin |
+| 9 | **`AuditLogRepository` `delete*` metodlarini oshkor qiladi** | 🟡 ongli qaror: kod darajasida qoldirildi, Faza 8 da `REVOKE DELETE ON audit_logs` bilan yopiladi |
+| 10 | **`ROLE_DELETED` / `ROLE_ASSIGNED` / `ROLE_REVOKED` enum'da bor, endpoint yo'q** | 🟡 `RoleService.delete()` va rol biriktirish endpoint'lari bilan birga ulanadi (#6 bilan bog'liq) |
 
 ## Progress
 
@@ -59,8 +61,8 @@ Narx (o'lchangan): sessiya 0.06 ms + user/rol/permission 0.19 ms = **~0.25 ms**,
   - [x] **7B** — Xavfsizlik header'lari: CSP, Referrer-Policy, Permissions-Policy, HSTS + `forward-headers-strategy`; **ikkala** filter chain'da (CORS ataylab yo'q — ADR #22) ✅ 2026-09-27
   - [x] **7C** — Brute-force: hisob bo'yicha vaqtinchalik blok (V9, `isAccountNonLocked`) ✅ 2026-09-27
         (IP bo'yicha rate limit → nginx, Faza 8)
-  - [ ] **7D** — Audit log ← **HOZIR**
-  - [ ] **7E** — Testlar (Testcontainers + `@WithMockUser`)
+  - [x] **7D** — Audit log: `audit_logs` (V10), fluent `AuditService`, 11 ta event, `/audit` endpoint ✅ 2026-09-27
+  - [ ] **7E** — Testlar (Testcontainers + `@WithMockUser`) ← **HOZIR**
 - [ ] **Faza 8** — Deployment: ahost.uz hosting + domen, backend va frontend yuklash, nginx
 
 ---
@@ -1081,3 +1083,11 @@ olti oydan keyin ham javobsiz qolmasin.
 | 28 | 2026-09-27 | `AuthenticationSuccessEvent` listener'ida **`instanceof CustomUserDetails`** sharti | Tekshirildi (bytecode): `OAuth2ResourceServerConfigurer` `JwtAuthenticationProvider` ni `http.authenticationProvider()` ga qo'shadi, `HttpSecurityConfiguration` esa local builder'ga event publisher beradi → **har bir JWT so'rovi** `AuthenticationSuccessEvent` chiqaradi. Shartsiz listener har so'rovda bekorga `REQUIRES_NEW` tranzaksiya + `UPDATE` qilardi. Login'da principal `CustomUserDetails`, JWT'da `AuthUser` record — shu bilan ajratiladi. O'lchandi: 10 ta JWT so'rov → `failed_attempts` 3 da qoldi, yozuv tranzaksiyasi yo'q |
 | 29 | 2026-09-27 | `onFailure`/`onSuccess` — `@Transactional(propagation = REQUIRES_NEW)` | Autentifikatsiya **muvaffaqiyatsiz** tugaydi (exception) → bir xil tranzaksiyada bo'lsa sanoq rollback bo'lardi va himoya jimgina ishlamasdi (Faza 5B dagi `revokeAllForUser` bilan bir xil tuzoq). O'lchandi: 4 ta xato urinish → attempts 1,2,3,4 |
 | 30 | 2026-09-27 | Xavfsizlik header'lari **har bir** `SecurityFilterChain` da alohida e'lon qilinadi (umumiy `securityHeaders()` metodi) | Zanjirlar orasida sozlama meros bo'lmaydi. `apiChain` ga qo'shilgan `.headers(...)` `publicChain` ga o'tmagan va `login`/`register`/`refresh` — eng nozik uch endpoint — CSP/Referrer-Policy'siz qolgan edi (o'lchandi: 0/3, tuzatilgandan keyin 3/3). Xuddi `.cors()` ni ikkala zanjirga qo'yish kerak bo'lgani kabi |
+| 31 | 2026-09-27 | `AuditLog` **`BaseEntity`dan meros olmaydi** | Audit append-only: `deleted` + `@SQLDelete` bo'lsa "audit'dan izni yashirish" imkoni paydo bo'ladi; `updatedDate` ham ma'nosiz. Umumiy bazaviy klass hamma entity'ga to'g'ri kelmaydi |
+| 32 | 2026-09-27 | `actor_email` **denormalizatsiya**, `actor_id` da **FK yo'q** | Audit yozuv immutable snapshot: user o'chsa yoki emailini o'zgartirsa tarix buzilmasin. Normalizatsiya qoidasining ongli buzilishi |
+| 33 | 2026-09-27 | Tranzaksiya chegarasi alohida bean'da (`AuditWriter`), `AuditService` faqat fluent builder | Builder `this` orqali `AuditService` ning `@Transactional` metodini chaqirsa — **self-invocation**, proxy chetlab o'tiladi va `REQUIRES_NEW`/`MANDATORY` **jimgina** ishlamaydi. Builder inject qilingan `AuditWriter` **proxy**sini ushlaydi |
+| 34 | 2026-09-27 | `AuditWriter` klassi package-private, **metodlari `public`** | Tekshirildi (spring-tx 7.0.9 bytecode): `AnnotationTransactionAttributeSource()` → `publicMethodsOnly = true`; `computeTransactionAttribute` → `allowPublicMethodsOnly() && !isPublic(method)` bo'lsa `null` qaytaradi. Ya'ni **public bo'lmagan metodda `@Transactional` jimgina e'tiborsiz qoladi** |
+| 35 | 2026-09-27 | `record()` = `MANDATORY` (biznes o'zgarishi bilan atomik), `recordIndependently()` = `REQUIRES_NEW` (exception kutilgan yo'llar) | Rol o'zgarishi rollback bo'lsa audit'da "o'zgardi" turishi yolg'on; login xatosi esa exception bilan tugaydi va bir tranzaksiyada bo'lsa audit yo'qoladi. `REQUIRES_NEW` metod ichidan `record()` chaqirilsa — o'sha mustaqil tranzaksiyaga qo'shiladi, ikkala xususiyat birga (`revokeAllForUser`) |
+| 36 | 2026-09-27 | `TOKEN_REFRESHED` **umuman yozilmaydi** | 15m TTL → ~32 refresh/kun/qurilma → 10k user × 2 qurilma ≈ 19 mln qator/oy, qiymati nol (`sessions.last_seen_at` bor). Audit'da signal-to-noise buzilardi |
+| 37 | 2026-09-27 | Audit yozuvi **amaldan keyin**; `details` uchun `HashMap` (`Map.of` emas) | Generatsiya qilingan id (`ROLE_CREATED`) va natija (`revokedCount`) faqat amaldan keyin ma'lum. `Map.of` null qiymatda **NPE** tashlaydi (jshell'da tekshirilgan) — builder'ning `detail(k,v)` metodi bu xatoni takrorlanmaydigan qiladi |
+| 38 | 2026-09-27 | `spring.data.web.pageable.max-page-size: 200` — **`application.yml`** da | API xulqi, muhit sozlamasi emas (dev/prod parity). Bytecode: `getPageable` oxirida `Math.min(pageSize, maxPageSize)` — `?size=` ham, `@PageableDefault` ham kesiladi, ya'ni haqiqiy himoya. O'lchandi: `?size=100000` → `size=200` |

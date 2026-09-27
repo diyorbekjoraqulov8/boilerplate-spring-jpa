@@ -11,6 +11,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import uz.app.projectv1.audit.AuditEvent;
+import uz.app.projectv1.audit.AuditService;
+import uz.app.projectv1.audit.entity.AuditLog;
 import uz.app.projectv1.auth.dto.LoginRequest;
 import uz.app.projectv1.auth.dto.RegisterRequest;
 import uz.app.projectv1.auth.dto.SessionResponse;
@@ -26,6 +29,7 @@ import uz.app.projectv1.user.entity.UserEntity;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -43,6 +47,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final SessionRepository sessionRepository;
+    private final AuditService auditService;
 
     public record LoginResult(
             String accessToken,
@@ -67,6 +72,11 @@ public class AuthService {
         UserEntity user = new UserEntity();
         user.setEmail(request.email());
         user.setPassword(passwordEncoder.encode(request.password()));
+
+        auditService.event(AuditEvent.USER_REGISTERED)
+                .actor(user.getId(), user.getEmail())
+                .target("USER", user.getId())
+                .record();
 
         user.getRoles().add(userRole);
 
@@ -112,6 +122,14 @@ public class AuthService {
 
         sessionRepository.findByPreviousRefreshTokenHash(hash).ifPresent(stolen -> {
             sessionService.revokeAllForUser(stolen.getUserId());
+
+            auditService.event(AuditEvent.REFRESH_TOKEN_REUSE)
+                    .failure()
+                    .actor(stolen.getUserId(), null)
+                    .target("SESSION", stolen.getId())
+                    .detail("reason", "previous refresh token reused")
+                    .recordIndependently();
+
             throw new BadCredentialsException("Refresh token qayta ishlatildi");
         });
 
@@ -140,6 +158,9 @@ public class AuthService {
 
     @Transactional
     public void logout(UUID sessionId) {
+        auditService.event(AuditEvent.LOGOUT)
+                .target("SESSION", sessionId)
+                .record();
         sessionService.revoke(sessionId);
     }
 
@@ -159,6 +180,9 @@ public class AuthService {
 
     @Transactional
     public void revokeSession(AuthUser user, UUID sessionId) {
+        auditService.event(AuditEvent.SESSION_REVOKED)
+                .target("SESSION", sessionId)
+                .record();
         sessionService.revokeOwn(user.id(), sessionId);
     }
 }

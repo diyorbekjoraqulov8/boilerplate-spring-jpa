@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import uz.app.projectv1.audit.AuditEvent;
+import uz.app.projectv1.audit.AuditService;
 import uz.app.projectv1.common.exception.NotFoundException;
 import uz.app.projectv1.security.entity.Session;
 
@@ -17,6 +19,7 @@ import java.util.UUID;
 public class SessionService {
 
     private final SessionRepository sessionRepository;
+    private final AuditService auditService;
 
     @Transactional
     public Session create(Long userId, String device, String ip, Duration ttl, String refreshHash) {
@@ -55,7 +58,15 @@ public class SessionService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int revokeAllForUser(Long userId) {
-        return this.sessionRepository.revokeAllByUserId(userId, LocalDateTime.now());
+        int revoked = this.sessionRepository.revokeAllByUserId(userId, LocalDateTime.now());
+
+        auditService.event(AuditEvent.SESSION_REVOKED_ALL)
+                .actor(userId, null)
+                .target("USER", userId)
+                .detail("revokedCount", revoked)
+                .record();
+
+        return revoked;
     }
 
     @Transactional(readOnly = true)
