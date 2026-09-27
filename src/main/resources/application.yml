@@ -33,3 +33,7 @@ app:
   cookie:
     secure: true
     same-site: Strict
+
+  login:
+    max-attempts: 5
+    lock-duration: 15m

@@ -2,8 +2,12 @@ package uz.app.projectv1.user;
 
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import uz.app.projectv1.user.entity.UserEntity;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -24,4 +28,32 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
     Optional<UserEntity> findWithPermissionsByEmail(String email);
 
     boolean existsByEmail(String email);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+       UPDATE UserEntity u
+          SET u.failedAttempts = u.failedAttempts + 1
+        WHERE u.email = :email AND u.deleted = false
+       """)
+    int incrementFailedAttempts(@Param("email") String email);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+       UPDATE UserEntity u
+          SET u.lockedUntil = :until, u.failedAttempts = 0
+        WHERE u.email = :email AND u.deleted = false
+          AND u.failedAttempts >= :maxAttempts
+       """)
+    int lockIfExceeded(@Param("email") String email,
+                       @Param("until") LocalDateTime until,
+                       @Param("maxAttempts") int maxAttempts);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+       UPDATE UserEntity u
+          SET u.failedAttempts = 0, u.lockedUntil = null
+        WHERE u.email = :email AND u.deleted = false
+          AND (u.failedAttempts > 0 OR u.lockedUntil IS NOT NULL)
+       """)
+    int resetFailedAttempts(@Param("email") String email);
 }

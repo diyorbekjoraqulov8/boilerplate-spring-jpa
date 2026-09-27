@@ -31,5 +31,7 @@ public interface UserMapper {
     @Mapping(target = "password",    ignore = true)
     @Mapping(target = "roles",       ignore = true)
     @Mapping(target = "active",      ignore = true)
+    @Mapping(target = "failedAttempts",  ignore = true)
+    @Mapping(target = "lockedUntil",     ignore = true)
     UserEntity toEntity(UserRequest request);
 }

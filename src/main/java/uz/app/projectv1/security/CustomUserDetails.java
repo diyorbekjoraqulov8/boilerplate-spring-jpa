@@ -7,6 +7,7 @@ import uz.app.projectv1.rbac.entity.Permission;
 import uz.app.projectv1.rbac.entity.Role;
 import uz.app.projectv1.user.entity.UserEntity;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
@@ -16,6 +17,7 @@ public record CustomUserDetails(
         String email,
         String password,
         boolean active,
+        LocalDateTime lockedUntil,
         Collection<? extends GrantedAuthority> authorities
 ) implements UserDetails {
 
@@ -33,7 +35,18 @@ public record CustomUserDetails(
                 authorities.add(new SimpleGrantedAuthority(p.getName()));
             }
         }
-        return new CustomUserDetails(user.getId(), user.getEmail(),
-                user.getPassword(), user.isActive(), authorities);
+        return new CustomUserDetails(
+                user.getId(),
+                user.getEmail(),
+                user.getPassword(),
+                user.isActive(),
+                user.getLockedUntil(),
+                authorities
+        );
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return lockedUntil == null || lockedUntil.isBefore(LocalDateTime.now());
     }
 }

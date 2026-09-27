@@ -8,6 +8,7 @@ import org.hibernate.annotations.SQLRestriction;
 import uz.app.projectv1.common.entity.BaseEntity;
 import uz.app.projectv1.rbac.entity.Role;
 
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -35,4 +36,10 @@ public class UserEntity extends BaseEntity {
 
     @Column(nullable = false)
     private boolean active = true;
+
+    @Column(name = "failed_attempts", nullable = false)
+    private int failedAttempts = 0;
+
+    @Column(name = "locked_until")
+    private LocalDateTime lockedUntil;
 }
