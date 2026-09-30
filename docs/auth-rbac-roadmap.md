@@ -62,7 +62,10 @@ Narx (o'lchangan): sessiya 0.06 ms + user/rol/permission 0.19 ms = **~0.25 ms**,
   - [x] **7C** — Brute-force: hisob bo'yicha vaqtinchalik blok (V9, `isAccountNonLocked`) ✅ 2026-09-27
         (IP bo'yicha rate limit → nginx, Faza 8)
   - [x] **7D** — Audit log: `audit_logs` (V10), fluent `AuditService`, 11 ta event, `/audit` endpoint ✅ 2026-09-27
-  - [ ] **7E** — Testlar (Testcontainers + `@WithMockUser`) ← **HOZIR**
+  - [ ] **7E** — ~~Testlar~~ **RAD ETILDI** 2026-09-30 (ADR #39)
+  - [ ] **7F** — OpenAPI (springdoc) ← **HOZIR**
+  - [ ] **7G** — Logging: MDC'ga `requestId` + `userId`
+  - [ ] **7H** — Actuator: `/health` ochiq, qolgani `ADMIN`ga
 - [ ] **Faza 8** — Deployment: ahost.uz hosting + domen, backend va frontend yuklash, nginx
 
 ---
@@ -992,9 +995,11 @@ Ushbular tugagach qilinadi, oldin emas:
       rate limit (Bucket4j).
 - [ ] **Xavfsizlik header'lari** — HSTS, `X-Content-Type-Options`, CSP.
 - [ ] **Audit log** — kim kirdi, kim rol o'zgartirdi. Alohida jadval.
-- [ ] **Testlar** — `@SpringBootTest` + `MockMvc` + `@WithMockUser`.
-      Har rol uchun 403/200 testi. DB uchun **Testcontainers** (H2 emas —
-      H2 PostgreSQL'dek tutmaydi va yolg'on ishonch beradi).
+- [x] ~~**Testlar**~~ — **rad etildi** 2026-09-30, ADR #39. Test manbalari va
+      Testcontainers dependency'lari o'chirildi. Qaytish sharti: jamoa yoki CI
+      paydo bo'lsa. Tayyor spetsifikatsiya shu fayl tarixida (2026-09-28 sessiyasi):
+      `IntegrationTest` bazaviy klass (`@ServiceConnection` + static konteyner),
+      `MigrationIT`, `SecurityMatrixIT`.
 - [ ] **OpenAPI** — springdoc, `Authorize` tugmasi bilan.
 - [ ] **Logging** — `MDC` ga `requestId` va `userId`. Parol/token'ni **hech
       qachon** log'ga yozma.
@@ -1091,3 +1096,4 @@ olti oydan keyin ham javobsiz qolmasin.
 | 36 | 2026-09-27 | `TOKEN_REFRESHED` **umuman yozilmaydi** | 15m TTL → ~32 refresh/kun/qurilma → 10k user × 2 qurilma ≈ 19 mln qator/oy, qiymati nol (`sessions.last_seen_at` bor). Audit'da signal-to-noise buzilardi |
 | 37 | 2026-09-27 | Audit yozuvi **amaldan keyin**; `details` uchun `HashMap` (`Map.of` emas) | Generatsiya qilingan id (`ROLE_CREATED`) va natija (`revokedCount`) faqat amaldan keyin ma'lum. `Map.of` null qiymatda **NPE** tashlaydi (jshell'da tekshirilgan) — builder'ning `detail(k,v)` metodi bu xatoni takrorlanmaydigan qiladi |
 | 38 | 2026-09-27 | `spring.data.web.pageable.max-page-size: 200` — **`application.yml`** da | API xulqi, muhit sozlamasi emas (dev/prod parity). Bytecode: `getPageable` oxirida `Math.min(pageSize, maxPageSize)` — `?size=` ham, `@PageableDefault` ham kesiladi, ya'ni haqiqiy himoya. O'lchandi: `?size=100000` → `size=200` |
+| 39 | 2026-09-30 | **Avtomatik testlar yozilmaydi** (Faza 7E rad etildi) | Egasining qarori: yakka ishlaydigan o'rganish loyihasi, CI yo'q, jamoa yo'q — har o'zgarish qo'lda `curl`/`psql` bilan sinaladi va har faza oxirida o'lchab tasdiqlangan. Test suite'ning asosiy qiymati (boshqa odam kodni buzganini avtomatik aytish) bu kontekstda mavjud emas. **Narxi ongli qabul qilindi:** regressiya faqat qo'lda topiladi; `@EnableMethodSecurity` / CSRF / header turidagi "jimgina ishlamay qolish" nuqsonlari qaytib kelsa darhol bilinmaydi. **Qaytish sharti:** jamoa a'zosi qo'shilishi yoki CI o'rnatilishi. ⚠️ Eslatma: enterprise muhitda test odatda majburiy (PR gate, coverage chegarasi) — bu qaror faqat shu loyihaga tegishli |

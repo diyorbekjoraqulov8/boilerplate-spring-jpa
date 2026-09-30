@@ -111,7 +111,7 @@ Har feature ichida: `XController`, `XService`, `XRepository`, `entity/`, `dto/`.
 
 ---
 
-## 3. HOZIRGI HOLAT (2026-09-27)
+## 3. HOZIRGI HOLAT (2026-09-30)
 
 **✅ Faza 0 tugadi** — kod yozildi, review qilindi, ishlab turgan ilovada tekshirildi.
 
@@ -375,4 +375,20 @@ birinchi ish — uni **buzib sinash** (yo'q qilib, kutilgan xato chiqishini ko'r
 `ip` ustuni lokalda `0:0:0:0:0:0:0:1` (IPv6 loopback) — `VARCHAR(45)` qarori
 o'zini oqladi, `VARCHAR(15)` kesib tashlardi.
 
-Keyingi qadam: `docs/auth-rbac-roadmap.md` → **Faza 7E** (testlar).
+### 🔴 Avtomatik test YOZILMAYDI (2026-09-30 qarori — ADR #39)
+
+Faza 7E rad etildi, test manbalari va Testcontainers dependency'lari o'chirildi.
+Sabab: yakka o'rganish loyihasi, CI yo'q, jamoa yo'q — tekshirish qo'lda
+`curl` / `psql` bilan bajariladi.
+
+**Shuning uchun:**
+- ❌ Test yozishni **taklif qilma** va "test qo'shamizmi?" deb so'rama.
+- ✅ Har fazadan keyin **qo'lda tekshirish buyruqlarini** ber (`curl`, `psql`) —
+  hozirgacha shunday qilingan, shu davom etadi.
+- ✅ Kod review'da regressiya xavfini **o'zing** ko'rsat, chunki uni ushlaydigan
+  test yo'q.
+- Qaytish sharti: jamoa yoki CI paydo bo'lishi. Tayyor spetsifikatsiya
+  roadmap tarixida (2026-09-28 sessiyasi).
+
+Keyingi qadam: `docs/auth-rbac-roadmap.md` → **Faza 7F** (OpenAPI), keyin
+7G (logging/MDC), 7H (actuator). Undan keyin **Faza 8** (deployment).
